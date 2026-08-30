@@ -97,7 +97,6 @@ function arquivoParaBase64(file) {
 
 // ---------- Leitura do laudo de RM pela câmera ----------
 const laudoInput = document.getElementById("laudo-input");
-document.getElementById("btn-laudo").addEventListener("click", () => laudoInput.click());
 
 laudoInput.addEventListener("change", async () => {
   const file = laudoInput.files[0];
@@ -161,7 +160,6 @@ laudoInput.addEventListener("change", async () => {
 
 // ---------- Registro de negativa por foto ----------
 const negativaInput = document.getElementById("negativa-input");
-document.getElementById("btn-negativa").addEventListener("click", () => negativaInput.click());
 
 negativaInput.addEventListener("change", async () => {
   const file = negativaInput.files[0];
