@@ -1,7 +1,28 @@
-// ---------- Registro do service worker ----------
+// ---------- Service worker com atualização automática ----------
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    navigator.serviceWorker.register("service-worker.js").then((reg) => {
+      // Checa se há versão nova toda vez que o app abre
+      reg.update().catch(() => {});
+
+      reg.addEventListener("updatefound", () => {
+        const novoWorker = reg.installing;
+        novoWorker.addEventListener("statechange", () => {
+          if (novoWorker.state === "installed" && navigator.serviceWorker.controller) {
+            // Já tem uma versão nova pronta — manda ela assumir na hora
+            novoWorker.postMessage("SKIP_WAITING");
+          }
+        });
+      });
+    }).catch(() => {});
+  });
+
+  // Quando a nova versão assume o controle, recarrega a página automaticamente
+  let jaRecarregou = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (jaRecarregou) return;
+    jaRecarregou = true;
+    window.location.reload();
   });
 }
 
