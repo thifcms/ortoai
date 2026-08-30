@@ -1,4 +1,7 @@
-// ---------- Service worker com atualização automática ----------
+// ---------- Backend (Cloud Function no Firebase) ----------
+const API_BASE = "https://southamerica-east1-ortoai-pedidos.cloudfunctions.net/api";
+
+// ---------- Registro do service worker com atualização automática ----------
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("service-worker.js").then((reg) => {
@@ -113,7 +116,7 @@ laudoInput.addEventListener("change", async () => {
 
   try {
     const imagemBase64 = await arquivoParaBase64(file);
-    const resp = await fetch("/api/laudo", {
+    const resp = await fetch(`${API_BASE}/laudo`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -186,7 +189,7 @@ negativaInput.addEventListener("change", async () => {
 
   try {
     const imagemBase64 = await arquivoParaBase64(file);
-    const resp = await fetch("/api/negativa", {
+    const resp = await fetch(`${API_BASE}/negativa`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hospital, convenio, codigo, material, imagemBase64, mimeType: file.type }),
@@ -277,7 +280,7 @@ document.getElementById("to-step-3").addEventListener("click", async () => {
 
 async function gerarParecer(payload) {
   try {
-    const resp = await fetch("/api/parecer", {
+    const resp = await fetch(`${API_BASE}/parecer`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// O PWA nunca fala com o Firestore diretamente — só a Cloud Function (Admin SDK),
+// que ignora estas regras. Por isso, acesso direto do cliente fica bloqueado por padrão.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
