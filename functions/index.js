@@ -13,7 +13,7 @@ const fetch = require("node-fetch");
 const store = require("./store");
 
 admin.initializeApp();
-setGlobalOptions({ region: "southamerica-east1", maxInstances: 10 });
+setGlobalOptions({ region: "southamerica-east1", maxInstances: 10, timeoutSeconds: 180, memory: "512MiB" });
 
 const app = express();
 app.use(cors({ origin: true }));
