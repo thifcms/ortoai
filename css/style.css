@@ -21,8 +21,9 @@
 button{
   -webkit-tap-highlight-color:transparent;
   transition:transform .15s ease, box-shadow .15s ease, background .2s ease, border-color .2s ease;
+  transform-style:preserve-3d;
 }
-button:active{transform:scale(0.97);}
+button:active{transform:perspective(400px) rotateX(6deg) scale(0.97) translateZ(-4px);}
 
 body{
   background:
@@ -43,6 +44,7 @@ body{
   min-height:100vh;
   display:flex;
   flex-direction:column;
+  perspective:1200px;
 }
 
 /* ---- Header ---- */
@@ -152,11 +154,22 @@ body{
 }
 .screen.active{
   display:block;
-  animation:fadeInUp .4s ease;
+  animation:screenIn3D .6s cubic-bezier(.22,1,.36,1);
+  transform-origin:50% 0%;
+  transform-style:preserve-3d;
 }
-@keyframes fadeInUp{
-  from{opacity:0; transform:translateY(8px);}
-  to{opacity:1; transform:translateY(0);}
+@keyframes screenIn3D{
+  from{
+    opacity:0;
+    transform:rotateX(-18deg) translateY(26px) translateZ(-40px) scale(.96);
+  }
+  60%{
+    opacity:1;
+  }
+  to{
+    opacity:1;
+    transform:rotateX(0deg) translateY(0) translateZ(0) scale(1);
+  }
 }
 
 .field-group{margin-bottom:20px;}
@@ -232,7 +245,7 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   box-shadow:0 10px 26px rgba(47,111,237,0.28);
   transition:transform .18s ease, box-shadow .18s ease;
 }
-.btn-primary:active{transform:translateY(1px) scale(.99); box-shadow:0 5px 14px rgba(47,111,237,0.22);}
+.btn-primary:active{transform:perspective(400px) rotateX(6deg) translateY(1px) scale(.97) translateZ(-4px); box-shadow:0 5px 14px rgba(47,111,237,0.22);}
 .btn-ghost{
   width:100%;
   background:var(--surface);
@@ -283,7 +296,8 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   padding:14px 16px;
   box-shadow:0 4px 16px rgba(16,25,40,0.05);
   opacity:0;
-  animation:cardIn .4s ease forwards;
+  transform-origin:50% 100%;
+  animation:cardIn3D .5s cubic-bezier(.22,1,.36,1) forwards;
 }
 .laudo-card .meta{
   font-family:'JetBrains Mono', monospace;
@@ -351,12 +365,20 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   margin-bottom:14px;
   box-shadow:0 8px 24px rgba(16,25,40,0.06);
   opacity:0;
-  animation:cardIn .45s ease forwards;
+  transform-origin:50% 100%;
+  transform-style:preserve-3d;
+  animation:cardIn3D .6s cubic-bezier(.22,1,.36,1) forwards;
   animation-delay:var(--stagger, 0ms);
 }
-@keyframes cardIn{
-  from{opacity:0; transform:translateY(14px) scale(.98);}
-  to{opacity:1; transform:translateY(0) scale(1);}
+@keyframes cardIn3D{
+  from{
+    opacity:0;
+    transform:perspective(900px) rotateX(35deg) translateY(30px) translateZ(-60px) scale(.92);
+  }
+  to{
+    opacity:1;
+    transform:perspective(900px) rotateX(0deg) translateY(0) translateZ(0) scale(1);
+  }
 }
 .card h3{
   font-family:'Space Grotesk', sans-serif;
@@ -400,24 +422,36 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   color:var(--ink-dim);
 }
 .empty-state .glyph{
-  font-family:'Space Grotesk', sans-serif;
-  font-size:2.4rem;
-  color:var(--accent);
-  margin-bottom:10px;
   display:inline-block;
-  animation:pulse 1.8s ease-in-out infinite;
+  width:52px;
+  height:52px;
+  margin-bottom:14px;
+  perspective:300px;
 }
-@supports (background-clip: text) or (-webkit-background-clip: text){
-  .empty-state .glyph{
-    background:linear-gradient(135deg, var(--accent), var(--accent-2));
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-  }
+.cube3d{
+  width:100%;
+  height:100%;
+  position:relative;
+  transform-style:preserve-3d;
+  animation:cubeSpin 2.6s linear infinite;
 }
-@keyframes pulse{
-  0%,100%{opacity:0.55; transform:scale(1);}
-  50%{opacity:1; transform:scale(1.08);}
+.cube3d .face{
+  position:absolute;
+  width:52px;
+  height:52px;
+  border:1.5px solid var(--accent);
+  background:linear-gradient(135deg, rgba(47,111,237,0.16), rgba(18,180,196,0.16));
+  border-radius:8px;
+}
+.cube3d .front{transform:translateZ(26px);}
+.cube3d .back{transform:translateZ(-26px) rotateY(180deg);}
+.cube3d .right{transform:rotateY(90deg) translateZ(26px);}
+.cube3d .left{transform:rotateY(-90deg) translateZ(26px);}
+.cube3d .top{transform:rotateX(90deg) translateZ(26px);}
+.cube3d .bottom{transform:rotateX(-90deg) translateZ(26px);}
+@keyframes cubeSpin{
+  from{transform:rotateX(-24deg) rotateY(0deg);}
+  to{transform:rotateX(-24deg) rotateY(360deg);}
 }
 
 /* ---- Bottom bar ---- */
