@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>OrtoAI</title>
+<meta name="theme-color" content="#F3F7FC" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="app-header">
+    <div class="header-row">
+      <div>
+        <div class="brand">OrtoAI <small>Joelho · Evidência</small></div>
+        <div class="tagline">Justificativa científica para reduzir glosas</div>
+      </div>
+      <button class="btn-icon" id="open-negativa" aria-label="Registrar negativa recebida" title="Registrar negativa recebida">⚠</button>
+    </div>
+  </header>
+
+  <nav class="rail" id="main-rail">
+    <div class="rail-step active" data-step="1"><span>01</span>Diagnóstico</div>
+    <div class="rail-step" data-step="2"><span>02</span>Código &amp; material</div>
+    <div class="rail-step" data-step="3"><span>03</span>Parecer</div>
+  </nav>
+
+  <!-- Etapa 1 — Diagnóstico -->
+  <section class="screen active" id="screen-1">
+    <div class="field-group">
+      <label for="paciente">Paciente</label>
+      <input type="text" id="paciente" placeholder="Nome do paciente" />
+    </div>
+
+    <div class="field-group">
+      <label for="diagnostico">Diagnóstico do paciente</label>
+      <textarea id="diagnostico" rows="4" placeholder="Ex: Lesão completa do LCA associada a lesão em alça de balde do menisco medial, joelho direito"></textarea>
+    </div>
+
+    <div class="field-group">
+      <label>Laudo de RM</label>
+      <input type="file" id="laudo-input" accept="image/*" capture="environment" hidden />
+      <button class="btn-camera" id="btn-laudo">📷 Ler laudo pela câmera</button>
+      <div id="laudo-status" class="camera-status" style="display:none;"></div>
+      <div id="laudo-result" style="display:none;"></div>
+    </div>
+
+    <div class="field-group">
+      <label for="hospital">Hospital / convênio</label>
+      <input type="text" id="hospital" placeholder="Ex: Hospital Santa Cruz — Bradesco Saúde" />
+    </div>
+
+    <button class="btn-primary" id="to-step-2">Continuar</button>
+  </section>
+
+  <!-- Etapa 2 — Código e material -->
+  <section class="screen" id="screen-2">
+    <div class="field-group">
+      <label>Códigos TUSS propostos</label>
+      <div id="code-list"></div>
+      <button class="btn-add" id="add-code">+ adicionar código TUSS</button>
+    </div>
+    <div class="field-group">
+      <label>Materiais solicitados</label>
+      <div id="material-list"></div>
+      <button class="btn-add" id="add-material">+ adicionar material</button>
+    </div>
+    <button class="btn-primary" id="to-step-3">Buscar evidência e gerar parecer</button>
+    <button class="btn-ghost" id="back-to-1">Voltar</button>
+  </section>
+
+  <!-- Etapa 3 — Parecer da IA -->
+  <section class="screen" id="screen-3">
+    <div id="loading" class="empty-state">
+      <div class="glyph">⟡</div>
+      Buscando literatura de alto nível de evidência no PubMed…
+    </div>
+    <div id="result" style="display:none;"></div>
+    <button class="btn-ghost" id="back-to-2">Ajustar código / material</button>
+  </section>
+
+  <!-- Tela extra — Registrar negativa recebida -->
+  <section class="screen" id="screen-negativa">
+    <h2 class="screen-title">Registrar negativa recebida</h2>
+    <p class="screen-subtitle">Isso ajuda a IA a evitar o mesmo motivo de negativa em pedidos futuros para este material e hospital.</p>
+
+    <div class="field-group">
+      <label for="neg-hospital">Hospital / convênio</label>
+      <input type="text" id="neg-hospital" placeholder="Ex: Hospital Santa Cruz — Bradesco Saúde" />
+    </div>
+    <div class="field-group">
+      <label for="neg-codigo">Código TUSS (opcional)</label>
+      <input type="text" id="neg-codigo" placeholder="Ex: 30725036" />
+    </div>
+    <div class="field-group">
+      <label for="neg-material">Material negado</label>
+      <input type="text" id="neg-material" placeholder="Ex: Âncora de sutura 5.5mm titânio" />
+    </div>
+    <div class="field-group">
+      <label>Foto da carta de negativa</label>
+      <input type="file" id="negativa-input" accept="image/*" capture="environment" hidden />
+      <button class="btn-camera" id="btn-negativa">📷 Fotografar negativa</button>
+      <div id="negativa-status" class="camera-status" style="display:none;"></div>
+      <div id="negativa-result" style="display:none;"></div>
+    </div>
+
+    <button class="btn-ghost" id="close-negativa">Fechar</button>
+  </section>
+
+</div>
+
+<div class="bottom-bar" id="bottom-bar" style="display:none;">
+  <button class="btn-primary" id="copy-text">Copiar texto para o pedido</button>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>

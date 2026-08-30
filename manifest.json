@@ -1,0 +1,15 @@
+{
+  "name": "OrtoAI — Pedido Cirúrgico com Base Científica",
+  "short_name": "OrtoAI",
+  "description": "Justificativa científica de material cirúrgico de joelho para reduzir glosas dos convênios.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F3F7FC",
+  "theme_color": "#F3F7FC",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,340 @@
+// ---------- Registro do service worker ----------
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("service-worker.js").catch(() => {});
+  });
+}
+
+// ---------- Estado ----------
+const state = {
+  paciente: "",
+  diagnostico: "",
+  hospital: "",
+  codigos: [],
+  materiais: [],
+};
+
+// ---------- Navegação entre etapas ----------
+function goToStep(n) {
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  document.getElementById(`screen-${n}`).classList.add("active");
+
+  document.querySelectorAll(".rail-step").forEach((r) => {
+    const step = Number(r.dataset.step);
+    r.classList.toggle("active", step === n);
+    r.classList.toggle("done", step < n);
+  });
+
+  document.getElementById("bottom-bar").style.display = n === 3 ? "flex" : "none";
+}
+
+document.getElementById("to-step-2").addEventListener("click", () => {
+  state.paciente = document.getElementById("paciente").value.trim();
+  state.diagnostico = document.getElementById("diagnostico").value.trim();
+  state.hospital = document.getElementById("hospital").value.trim();
+  if (!state.diagnostico) {
+    document.getElementById("diagnostico").focus();
+    return;
+  }
+  goToStep(2);
+});
+
+document.getElementById("back-to-1").addEventListener("click", () => goToStep(1));
+document.getElementById("back-to-2").addEventListener("click", () => goToStep(2));
+
+// ---------- Tela de registrar negativa (fora do fluxo numerado) ----------
+const mainRail = document.getElementById("main-rail");
+let telaAnterior = 1;
+
+document.getElementById("open-negativa").addEventListener("click", () => {
+  telaAnterior = [...document.querySelectorAll(".screen")].findIndex((s) => s.classList.contains("active")) + 1;
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  document.getElementById("screen-negativa").classList.add("active");
+  mainRail.style.display = "none";
+  document.getElementById("bottom-bar").style.display = "none";
+});
+
+document.getElementById("close-negativa").addEventListener("click", () => {
+  mainRail.style.display = "flex";
+  goToStep(telaAnterior || 1);
+});
+
+// ---------- Utilitário: arquivo -> base64 ----------
+function arquivoParaBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- Leitura do laudo de RM pela câmera ----------
+const laudoInput = document.getElementById("laudo-input");
+document.getElementById("btn-laudo").addEventListener("click", () => laudoInput.click());
+
+laudoInput.addEventListener("change", async () => {
+  const file = laudoInput.files[0];
+  if (!file) return;
+
+  const status = document.getElementById("laudo-status");
+  const resultBox = document.getElementById("laudo-result");
+  status.style.display = "flex";
+  status.classList.remove("erro");
+  status.textContent = "Lendo laudo…";
+  resultBox.style.display = "none";
+
+  try {
+    const imagemBase64 = await arquivoParaBase64(file);
+    const paciente = document.getElementById("paciente").value.trim();
+    const diagnosticoDigitado = document.getElementById("diagnostico").value.trim();
+
+    const resp = await fetch("/api/laudo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paciente, imagemBase64, mimeType: file.type, diagnosticoDigitado }),
+    });
+    const data = await resp.json();
+
+    status.style.display = "none";
+    resultBox.style.display = "block";
+
+    const temIncoerencia = data.incoerencias && data.incoerencias.length > 0;
+    resultBox.innerHTML = `
+      <div class="laudo-card">
+        <div class="meta">${data.demo ? "Modo demonstração — laudo" : "Laudo lido"}</div>
+        <p>${data.textoExtraido}</p>
+        ${
+          temIncoerencia
+            ? `<ul class="incoerencias">${data.incoerencias.map((i) => `<li>${i}</li>`).join("")}</ul>`
+            : `<ul class="incoerencias ok"><li>Nenhuma incoerência encontrada com o diagnóstico digitado.</li></ul>`
+        }
+      </div>`;
+  } catch (err) {
+    status.style.display = "flex";
+    status.classList.add("erro");
+    status.textContent = "Não foi possível ler o laudo. Tente novamente.";
+  }
+});
+
+// ---------- Registro de negativa por foto ----------
+const negativaInput = document.getElementById("negativa-input");
+document.getElementById("btn-negativa").addEventListener("click", () => negativaInput.click());
+
+negativaInput.addEventListener("change", async () => {
+  const file = negativaInput.files[0];
+  if (!file) return;
+
+  const hospital = document.getElementById("neg-hospital").value.trim();
+  const material = document.getElementById("neg-material").value.trim();
+  const codigo = document.getElementById("neg-codigo").value.trim();
+  const status = document.getElementById("negativa-status");
+  const resultBox = document.getElementById("negativa-result");
+
+  if (!hospital || !material) {
+    status.style.display = "flex";
+    status.classList.add("erro");
+    status.textContent = "Preencha hospital e material antes de fotografar.";
+    negativaInput.value = "";
+    return;
+  }
+
+  status.style.display = "flex";
+  status.classList.remove("erro");
+  status.textContent = "Lendo negativa…";
+  resultBox.style.display = "none";
+
+  try {
+    const imagemBase64 = await arquivoParaBase64(file);
+    const resp = await fetch("/api/negativa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hospital, codigo, material, imagemBase64, mimeType: file.type }),
+    });
+    const data = await resp.json();
+
+    status.style.display = "none";
+    resultBox.style.display = "block";
+    resultBox.innerHTML = `
+      <div class="laudo-card">
+        <div class="meta">Motivo registrado</div>
+        <p>${data.motivoExtraido}</p>
+      </div>`;
+  } catch (err) {
+    status.style.display = "flex";
+    status.classList.add("erro");
+    status.textContent = "Não foi possível registrar a negativa. Tente novamente.";
+  }
+});
+
+// ---------- Listas dinâmicas: códigos TUSS e materiais ----------
+function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
+  const container = document.getElementById(containerId);
+  const row = document.createElement("div");
+  row.className = "code-row";
+
+  if (withCode) {
+    const codeInput = document.createElement("input");
+    codeInput.type = "text";
+    codeInput.className = "tuss";
+    codeInput.placeholder = placeholderCode;
+    row.appendChild(codeInput);
+  }
+
+  const mainInput = document.createElement("input");
+  mainInput.type = "text";
+  mainInput.placeholder = placeholderMain;
+  row.appendChild(mainInput);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.setAttribute("aria-label", "Remover");
+  removeBtn.textContent = "✕";
+  removeBtn.style.cssText = "background:none;border:none;color:#C0574C;font-size:1rem;cursor:pointer;padding:0 4px;";
+  removeBtn.addEventListener("click", () => row.remove());
+  row.appendChild(removeBtn);
+
+  container.appendChild(row);
+}
+
+document.getElementById("add-code").addEventListener("click", () => {
+  addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+});
+document.getElementById("add-material").addEventListener("click", () => {
+  addRow("material-list", { placeholderMain: "Ex: Âncora de sutura 5.5mm titânio", withCode: false });
+});
+
+addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+addRow("material-list", { placeholderMain: "Ex: Âncora de sutura 5.5mm titânio", withCode: false });
+
+function collectRows(containerId, withCode) {
+  const rows = [...document.querySelectorAll(`#${containerId} .code-row`)];
+  return rows
+    .map((row) => {
+      const inputs = row.querySelectorAll("input");
+      return withCode
+        ? { codigo: inputs[0].value.trim(), descricao: inputs[1].value.trim() }
+        : { descricao: inputs[0].value.trim() };
+    })
+    .filter((item) => item.descricao);
+}
+
+// ---------- Etapa 3: gerar parecer ----------
+document.getElementById("to-step-3").addEventListener("click", async () => {
+  state.codigos = collectRows("code-list", true);
+  state.materiais = collectRows("material-list", false);
+
+  goToStep(3);
+  document.getElementById("loading").style.display = "block";
+  document.getElementById("result").style.display = "none";
+
+  const parecer = await gerarParecer(state);
+
+  document.getElementById("loading").style.display = "none";
+  document.getElementById("result").style.display = "block";
+  renderParecer(parecer);
+});
+
+async function gerarParecer(payload) {
+  try {
+    const resp = await fetch("/api/parecer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error("backend indisponível");
+    return await resp.json();
+  } catch (err) {
+    return demoParecer(payload);
+  }
+}
+
+function demoParecer(payload) {
+  return {
+    demo: true,
+    itens: payload.materiais.length
+      ? payload.materiais.map((m) => ({
+          material: m.descricao,
+          nivelEvidencia: "II",
+          badge: "high",
+          resumo:
+            "Backend ainda não conectado — este é um texto de demonstração. Quando o servidor de busca (PubMed + IA) estiver no ar, aqui aparecerá a justificativa real com estudos citados.",
+        }))
+      : [],
+    alertaPacote: null,
+    textoPedido:
+      "[Demonstração] Conecte o backend em /api/parecer para gerar o texto real de justificativa, com estudos e nível de evidência, pronto para colar na solicitação do hospital.",
+  };
+}
+
+function renderParecer(parecer) {
+  const container = document.getElementById("result");
+  container.innerHTML = "";
+
+  if (parecer.demo) {
+    const notice = document.createElement("div");
+    notice.className = "card";
+    notice.innerHTML = `<span class="badge risk">Modo demonstração</span>
+      <p class="suggestion-text" style="margin-top:10px;">Backend de busca (PubMed + IA) ainda não conectado neste ambiente.</p>`;
+    container.appendChild(notice);
+  }
+
+  if (parecer.alertaPacote) {
+    const alerta = document.createElement("div");
+    alerta.className = "card";
+    alerta.innerHTML = `<span class="badge risk">Atenção — pacote do hospital</span>
+      <p class="suggestion-text" style="margin-top:10px;">${parecer.alertaPacote}</p>`;
+    container.appendChild(alerta);
+  }
+
+  parecer.itens.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <span class="badge ${item.badge}">Nível ${item.nivelEvidencia}</span>
+      ${item.alertaNegativaAnterior ? `<span class="badge risk" style="margin-left:6px;">Negativa anterior</span>` : ""}
+      <h3>${item.material}</h3>
+      ${evidenceLadder(item.nivelEvidencia)}
+      <p class="suggestion-text">${item.resumo}</p>
+    `;
+    container.appendChild(card);
+  });
+
+  const textCard = document.createElement("div");
+  textCard.className = "card";
+  textCard.innerHTML = `
+    <div class="meta">Texto para a solicitação</div>
+    <h3>Justificativa consolidada</h3>
+    <p class="suggestion-text" id="pedido-text">${parecer.textoPedido}</p>
+  `;
+  container.appendChild(textCard);
+}
+
+function evidenceLadder(nivel) {
+  const niveis = ["I", "II", "III", "IV", "V"];
+  const idx = niveis.indexOf(nivel);
+  return `<div class="evidence-ladder">
+    ${niveis
+      .map((n, i) => {
+        const lit = idx >= 0 && i <= idx;
+        return `<div class="rung ${lit ? "lit" : ""}">
+          <span class="lvl">${n}</span>
+          <span class="bar"></span>
+          <span class="n">${i === 0 ? "meta-análise" : i === niveis.length - 1 ? "opinião" : ""}</span>
+        </div>`;
+      })
+      .join("")}
+  </div>`;
+}
+
+// ---------- Copiar texto do pedido ----------
+document.getElementById("copy-text").addEventListener("click", () => {
+  const el = document.getElementById("pedido-text");
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => {
+    const btn = document.getElementById("copy-text");
+    const original = btn.textContent;
+    btn.textContent = "Copiado ✓";
+    setTimeout(() => (btn.textContent = original), 1600);
+  });
+});
