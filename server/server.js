@@ -27,7 +27,7 @@ app.use(cors());
 app.use(express.json({ limit: "12mb" })); // fotos em base64 (laudo/negativa) precisam de limite maior
 
 const PUBMED_BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
-const GEMINI_MODEL = "gemini-1.5-flash";
+const GEMINI_MODEL = "gemini-flash-latest"; // alias sempre atualizado — evita quebrar quando um modelo específico é descontinuado
 const CONFIDENCE_AUTONOMOUS = 0.9; // limiar para responder sem nova busca (igual Audit AI)
 
 // ---------- PubMed ----------
