@@ -68,15 +68,20 @@ async function chamarGemini({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   if (imagemBase64) parts.push({ inline_data: { mime_type: mimeType, data: imagemBase64 } });
 
   const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({ contents: [{ parts }] }),
     }
   );
   const data = await resp.json();
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || null;
+  const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+  if (!texto) {
+    console.error("Gemini não retornou texto. Resposta da API:", JSON.stringify(data));
+    return null;
+  }
+  return texto;
 }
 
 async function sintetizarComGemini({ diagnostico, material, estudos, exemplos, negativas }) {
