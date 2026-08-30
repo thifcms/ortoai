@@ -62,7 +62,10 @@ function nivelEvidenciaPorTipo(estudos) {
 // ---------- Gemini ----------
 async function chamarGemini({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY ausente em tempo de execução (process.env.GEMINI_API_KEY está vazio/undefined).");
+    return null;
+  }
 
   const parts = [{ text: prompt }];
   if (imagemBase64) parts.push({ inline_data: { mime_type: mimeType, data: imagemBase64 } });
@@ -187,6 +190,7 @@ app.post("/parecer", async (req, res) => {
 
 // ---------- Leitura do laudo de RM por foto ----------
 app.post("/laudo", async (req, res) => {
+  console.log("Rota /laudo chamada. GEMINI_API_KEY presente?", !!process.env.GEMINI_API_KEY);
   try {
     const { paciente, imagemBase64, mimeType, diagnosticoDigitado } = req.body;
     if (!imagemBase64) return res.status(400).json({ erro: "Envie a foto do laudo." });
