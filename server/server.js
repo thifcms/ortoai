@@ -130,7 +130,7 @@ a necessidade dele, não questioná-lo ou substituí-lo.`;
 // ---------- Rota principal: gerar parecer ----------
 app.post("/api/parecer", async (req, res) => {
   try {
-    const { paciente, diagnostico, hospital, codigos = [], materiais = [] } = req.body;
+    const { paciente, diagnostico, hospital, convenio, codigos = [], materiais = [] } = req.body;
     if (!diagnostico || !materiais.length) {
       return res.status(400).json({ erro: "Informe diagnóstico e ao menos um material." });
     }
@@ -149,7 +149,7 @@ app.post("/api/parecer", async (req, res) => {
     const itens = [];
     for (const m of materiais) {
       const exemplos = await store.getExemplos(m.descricao);
-      const negativas = hospital ? await store.getNegativas(hospital, m.descricao) : [];
+      const negativas = convenio ? await store.getNegativas(convenio, m.descricao) : [];
       const exemploAutonomo = exemplos.find((e) => e.confianca >= CONFIDENCE_AUTONOMOUS);
 
       let resumo, nivelEvidencia, estudos;
@@ -179,7 +179,7 @@ app.post("/api/parecer", async (req, res) => {
     const textoPedido = itens.map((i) => i.resumo).join(" ");
 
     if (paciente) {
-      await store.salvarPedidoPaciente(paciente, { diagnostico, hospital, codigos, materiais, textoPedido });
+      await store.salvarPedidoPaciente(paciente, { diagnostico, hospital, convenio, codigos, materiais, textoPedido });
     }
 
     res.json({ alertaPacote, itens, textoPedido });
@@ -196,14 +196,19 @@ app.post("/api/laudo", async (req, res) => {
     if (!imagemBase64) return res.status(400).json({ erro: "Envie a foto do laudo." });
 
     const prompt = `Você recebeu a foto de um laudo de ressonância magnética (RM) de joelho.
-1. Transcreva os achados relevantes do laudo de forma resumida (máximo 6 linhas).
-2. O médico digitou este diagnóstico: "${diagnosticoDigitado || "(não informado)"}".
+1. Identifique o nome do paciente, se estiver escrito no laudo. Se não encontrar, escreva "não identificado".
+2. Escreva um diagnóstico clínico curto (uma frase, linguagem médica objetiva) baseado nos achados
+   principais do laudo — isto será usado para preencher o campo de diagnóstico do médico.
+3. Transcreva os achados relevantes do laudo de forma resumida (máximo 6 linhas).
+4. O médico digitou este diagnóstico: "${diagnosticoDigitado || "(não informado)"}".
    Aponte, em uma lista curta, qualquer incoerência entre o laudo e o diagnóstico digitado
    (ex.: estrutura citada no diagnóstico que o laudo não confirma, lateralidade divergente,
    achado importante do laudo que não foi mencionado no diagnóstico).
-   Se não houver incoerência, responda apenas "Nenhuma incoerência encontrada."
+   Se o médico não digitou nada ou não houver incoerência, responda apenas "Nenhuma incoerência encontrada."
 
-Responda em português, em duas seções com os títulos exatos:
+Responda em português, em quatro seções com os títulos exatos, cada uma em sua própria linha:
+PACIENTE:
+DIAGNOSTICO_SUGERIDO:
 LAUDO:
 INCOERÊNCIAS:`;
 
@@ -211,24 +216,30 @@ INCOERÊNCIAS:`;
     if (!texto) {
       return res.status(200).json({
         demo: true,
+        nomePaciente: null,
+        diagnosticoSugerido: null,
         textoExtraido: "[Configure GEMINI_API_KEY para ativar a leitura real do laudo]",
         incoerencias: [],
       });
     }
 
-    const [, laudoBruto, incoerenciasBruto] =
-      texto.match(/LAUDO:([\s\S]*?)INCOERÊNCIAS:([\s\S]*)/i) || [null, texto, ""];
+    const match =
+      texto.match(/PACIENTE:([\s\S]*?)DIAGNOSTICO_SUGERIDO:([\s\S]*?)LAUDO:([\s\S]*?)INCOERÊNCIAS:([\s\S]*)/i) || [];
+    const [, pacienteBruto = "", diagnosticoBruto = "", laudoBruto = texto, incoerenciasBruto = ""] = match;
 
     const incoerencias = incoerenciasBruto
       .split("\n")
       .map((l) => l.replace(/^[-•\d.\s]+/, "").trim())
       .filter((l) => l && !/nenhuma incoerência/i.test(l));
 
+    const nomePaciente = pacienteBruto.trim() || null;
+    const diagnosticoSugerido = diagnosticoBruto.trim() || null;
+
     if (paciente) {
       await store.salvarLaudoPaciente(paciente, { textoExtraido: laudoBruto.trim(), diagnosticoDigitado });
     }
 
-    res.json({ textoExtraido: laudoBruto.trim(), incoerencias });
+    res.json({ nomePaciente, diagnosticoSugerido, textoExtraido: laudoBruto.trim(), incoerencias });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Falha ao ler o laudo." });
@@ -238,9 +249,9 @@ INCOERÊNCIAS:`;
 // ---------- Registrar negativa de convênio por foto ----------
 app.post("/api/negativa", async (req, res) => {
   try {
-    const { hospital, codigo, material, imagemBase64, mimeType } = req.body;
-    if (!hospital || !material || !imagemBase64) {
-      return res.status(400).json({ erro: "Informe hospital, material e a foto da negativa." });
+    const { hospital, convenio, codigo, material, imagemBase64, mimeType } = req.body;
+    if (!convenio || !material || !imagemBase64) {
+      return res.status(400).json({ erro: "Informe convênio, material e a foto da negativa." });
     }
 
     const prompt = `Você recebeu a foto de uma carta/laudo de negativa (glosa) de convênio de saúde
@@ -250,7 +261,7 @@ pelo convênio para a negativa. Seja literal ao motivo, sem interpretar além do
     const motivo = await chamarGemini({ prompt, imagemBase64, mimeType });
     const motivoFinal = motivo || "[Configure GEMINI_API_KEY para extrair o motivo automaticamente]";
 
-    await store.salvarNegativa({ hospital, codigo, material, motivo: motivoFinal });
+    await store.salvarNegativa({ hospital, convenio, codigo, material, motivo: motivoFinal });
 
     res.json({ motivoExtraido: motivoFinal });
   } catch (err) {

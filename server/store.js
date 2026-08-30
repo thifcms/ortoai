@@ -104,22 +104,23 @@ async function salvarLaudoPaciente(nome, laudo) {
 }
 
 // ---------- Negativas de convênio (aprendizado preventivo) ----------
-function chaveNegativa(hospital, material) {
-  return `${hospital}::${material.trim().toLowerCase()}`;
+// chave: quem nega é o convênio, não o hospital — por isso o histórico é por convênio + material
+function chaveNegativa(convenio, material) {
+  return `${convenio}::${material.trim().toLowerCase()}`;
 }
 
-async function salvarNegativa({ hospital, codigo, material, motivo }) {
+async function salvarNegativa({ hospital, convenio, codigo, material, motivo }) {
   const data = load();
-  const chave = chaveNegativa(hospital, material);
+  const chave = chaveNegativa(convenio, material);
   const lista = data.negativas[chave] || [];
-  lista.push({ codigo, motivo, data: new Date().toISOString() });
+  lista.push({ hospital, codigo, motivo, data: new Date().toISOString() });
   data.negativas[chave] = lista;
   save(data);
 }
 
-async function getNegativas(hospital, material) {
+async function getNegativas(convenio, material) {
   const data = load();
-  return data.negativas[chaveNegativa(hospital, material)] || [];
+  return data.negativas[chaveNegativa(convenio, material)] || [];
 }
 
 module.exports = {

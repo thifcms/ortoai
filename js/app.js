@@ -31,6 +31,7 @@ const state = {
   paciente: "",
   diagnostico: "",
   hospital: "",
+  convenio: "",
   codigos: [],
   materiais: [],
 };
@@ -53,6 +54,7 @@ document.getElementById("to-step-2").addEventListener("click", () => {
   state.paciente = document.getElementById("paciente").value.trim();
   state.diagnostico = document.getElementById("diagnostico").value.trim();
   state.hospital = document.getElementById("hospital").value.trim();
+  state.convenio = document.getElementById("convenio").value.trim();
   if (!state.diagnostico) {
     document.getElementById("diagnostico").focus();
     return;
@@ -105,17 +107,31 @@ laudoInput.addEventListener("change", async () => {
   status.textContent = "Lendo laudo…";
   resultBox.style.display = "none";
 
+  const campoPaciente = document.getElementById("paciente");
+  const campoDiagnostico = document.getElementById("diagnostico");
+  const diagnosticoJaPreenchido = campoDiagnostico.value.trim();
+
   try {
     const imagemBase64 = await arquivoParaBase64(file);
-    const paciente = document.getElementById("paciente").value.trim();
-    const diagnosticoDigitado = document.getElementById("diagnostico").value.trim();
-
     const resp = await fetch("/api/laudo", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paciente, imagemBase64, mimeType: file.type, diagnosticoDigitado }),
+      body: JSON.stringify({
+        paciente: campoPaciente.value.trim(),
+        imagemBase64,
+        mimeType: file.type,
+        diagnosticoDigitado: diagnosticoJaPreenchido,
+      }),
     });
     const data = await resp.json();
+
+    // Auto-preenche paciente e diagnóstico quando o médico ainda não os digitou
+    if (!campoPaciente.value.trim() && data.nomePaciente && data.nomePaciente !== "não identificado") {
+      campoPaciente.value = data.nomePaciente;
+    }
+    if (!diagnosticoJaPreenchido && data.diagnosticoSugerido) {
+      campoDiagnostico.value = data.diagnosticoSugerido;
+    }
 
     status.style.display = "none";
     resultBox.style.display = "block";
@@ -126,7 +142,9 @@ laudoInput.addEventListener("change", async () => {
         <div class="meta">${data.demo ? "Modo demonstração — laudo" : "Laudo lido"}</div>
         <p>${data.textoExtraido}</p>
         ${
-          temIncoerencia
+          !diagnosticoJaPreenchido
+            ? `<ul class="incoerencias ok"><li>Diagnóstico preenchido automaticamente a partir do laudo — revise antes de continuar.</li></ul>`
+            : temIncoerencia
             ? `<ul class="incoerencias">${data.incoerencias.map((i) => `<li>${i}</li>`).join("")}</ul>`
             : `<ul class="incoerencias ok"><li>Nenhuma incoerência encontrada com o diagnóstico digitado.</li></ul>`
         }
@@ -147,15 +165,16 @@ negativaInput.addEventListener("change", async () => {
   if (!file) return;
 
   const hospital = document.getElementById("neg-hospital").value.trim();
+  const convenio = document.getElementById("neg-convenio").value.trim();
   const material = document.getElementById("neg-material").value.trim();
   const codigo = document.getElementById("neg-codigo").value.trim();
   const status = document.getElementById("negativa-status");
   const resultBox = document.getElementById("negativa-result");
 
-  if (!hospital || !material) {
+  if (!convenio || !material) {
     status.style.display = "flex";
     status.classList.add("erro");
-    status.textContent = "Preencha hospital e material antes de fotografar.";
+    status.textContent = "Preencha convênio e material antes de fotografar.";
     negativaInput.value = "";
     return;
   }
@@ -170,7 +189,7 @@ negativaInput.addEventListener("change", async () => {
     const resp = await fetch("/api/negativa", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hospital, codigo, material, imagemBase64, mimeType: file.type }),
+      body: JSON.stringify({ hospital, convenio, codigo, material, imagemBase64, mimeType: file.type }),
     });
     const data = await resp.json();
 
