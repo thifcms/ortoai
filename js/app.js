@@ -230,7 +230,7 @@ function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
   removeBtn.type = "button";
   removeBtn.setAttribute("aria-label", "Remover");
   removeBtn.textContent = "✕";
-  removeBtn.style.cssText = "background:none;border:none;color:#C0574C;font-size:1rem;cursor:pointer;padding:0 4px;";
+  removeBtn.className = "btn-remove";
   removeBtn.addEventListener("click", () => row.remove());
   row.appendChild(removeBtn);
 
@@ -310,10 +310,13 @@ function demoParecer(payload) {
 function renderParecer(parecer) {
   const container = document.getElementById("result");
   container.innerHTML = "";
+  let ordem = 0;
+  const proximoAtraso = () => `${(ordem++) * 90}ms`;
 
   if (parecer.demo) {
     const notice = document.createElement("div");
     notice.className = "card";
+    notice.style.setProperty("--stagger", proximoAtraso());
     notice.innerHTML = `<span class="badge risk">Modo demonstração</span>
       <p class="suggestion-text" style="margin-top:10px;">Backend de busca (PubMed + IA) ainda não conectado neste ambiente.</p>`;
     container.appendChild(notice);
@@ -322,6 +325,7 @@ function renderParecer(parecer) {
   if (parecer.alertaPacote) {
     const alerta = document.createElement("div");
     alerta.className = "card";
+    alerta.style.setProperty("--stagger", proximoAtraso());
     alerta.innerHTML = `<span class="badge risk">Atenção — pacote do hospital</span>
       <p class="suggestion-text" style="margin-top:10px;">${parecer.alertaPacote}</p>`;
     container.appendChild(alerta);
@@ -330,6 +334,7 @@ function renderParecer(parecer) {
   parecer.itens.forEach((item) => {
     const card = document.createElement("div");
     card.className = "card";
+    card.style.setProperty("--stagger", proximoAtraso());
     card.innerHTML = `
       <span class="badge ${item.badge}">Nível ${item.nivelEvidencia}</span>
       ${item.alertaNegativaAnterior ? `<span class="badge risk" style="margin-left:6px;">Negativa anterior</span>` : ""}
@@ -342,6 +347,7 @@ function renderParecer(parecer) {
 
   const textCard = document.createElement("div");
   textCard.className = "card";
+  textCard.style.setProperty("--stagger", proximoAtraso());
   textCard.innerHTML = `
     <div class="meta">Texto para a solicitação</div>
     <h3>Justificativa consolidada</h3>
