@@ -44,8 +44,12 @@
     <div class="field-group">
       <label>Laudo de RM</label>
       <label class="btn-camera">
-        📷 Ler laudo por câmera ou foto
-        <input type="file" id="laudo-input" accept="image/*" class="file-cover" />
+        📷 Tirar foto agora
+        <input type="file" id="laudo-input-camera" accept="image/*" capture="environment" class="file-cover" />
+      </label>
+      <label class="btn-camera" style="margin-top:8px;">
+        🖼️ Escolher da galeria
+        <input type="file" id="laudo-input-galeria" accept="image/*" class="file-cover" />
       </label>
       <div id="laudo-status" class="camera-status" style="display:none;"></div>
       <div id="laudo-result" style="display:none;"></div>
@@ -123,8 +127,12 @@
     <div class="field-group">
       <label>Foto da carta de negativa</label>
       <label class="btn-camera">
-        📷 Fotografar ou anexar negativa
-        <input type="file" id="negativa-input" accept="image/*" class="file-cover" />
+        📷 Tirar foto agora
+        <input type="file" id="negativa-input-camera" accept="image/*" capture="environment" class="file-cover" />
+      </label>
+      <label class="btn-camera" style="margin-top:8px;">
+        🖼️ Escolher da galeria
+        <input type="file" id="negativa-input-galeria" accept="image/*" class="file-cover" />
       </label>
       <div id="negativa-status" class="camera-status" style="display:none;"></div>
       <div id="negativa-result" style="display:none;"></div>

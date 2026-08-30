@@ -95,11 +95,8 @@ function arquivoParaBase64(file) {
   });
 }
 
-// ---------- Leitura do laudo de RM pela câmera ----------
-const laudoInput = document.getElementById("laudo-input");
-
-laudoInput.addEventListener("change", async () => {
-  const file = laudoInput.files[0];
+// ---------- Leitura do laudo de RM pela câmera ou galeria ----------
+async function processarLaudo(file) {
   if (!file) return;
 
   const status = document.getElementById("laudo-status");
@@ -127,7 +124,6 @@ laudoInput.addEventListener("change", async () => {
     });
     const data = await resp.json();
 
-    // Auto-preenche paciente e diagnóstico quando o médico ainda não os digitou
     if (!campoPaciente.value.trim() && data.nomePaciente && data.nomePaciente !== "não identificado") {
       campoPaciente.value = data.nomePaciente;
     }
@@ -156,13 +152,13 @@ laudoInput.addEventListener("change", async () => {
     status.classList.add("erro");
     status.textContent = "Não foi possível ler o laudo. Tente novamente.";
   }
-});
+}
 
-// ---------- Registro de negativa por foto ----------
-const negativaInput = document.getElementById("negativa-input");
+document.getElementById("laudo-input-camera").addEventListener("change", (e) => processarLaudo(e.target.files[0]));
+document.getElementById("laudo-input-galeria").addEventListener("change", (e) => processarLaudo(e.target.files[0]));
 
-negativaInput.addEventListener("change", async () => {
-  const file = negativaInput.files[0];
+// ---------- Registro de negativa por foto (câmera ou galeria) ----------
+async function processarNegativa(file) {
   if (!file) return;
 
   const hospital = document.getElementById("neg-hospital").value.trim();
@@ -176,7 +172,8 @@ negativaInput.addEventListener("change", async () => {
     status.style.display = "flex";
     status.classList.add("erro");
     status.textContent = "Preencha convênio e material antes de fotografar.";
-    negativaInput.value = "";
+    document.getElementById("negativa-input-camera").value = "";
+    document.getElementById("negativa-input-galeria").value = "";
     return;
   }
 
@@ -206,7 +203,10 @@ negativaInput.addEventListener("change", async () => {
     status.classList.add("erro");
     status.textContent = "Não foi possível registrar a negativa. Tente novamente.";
   }
-});
+}
+
+document.getElementById("negativa-input-camera").addEventListener("change", (e) => processarNegativa(e.target.files[0]));
+document.getElementById("negativa-input-galeria").addEventListener("change", (e) => processarNegativa(e.target.files[0]));
 
 // ---------- Listas dinâmicas: códigos TUSS e materiais ----------
 function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
