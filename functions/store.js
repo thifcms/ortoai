@@ -58,7 +58,12 @@ async function listarPacientes() {
   return snap.docs.map((d) => {
     const p = d.data();
     const pedidos = p.pedidos || [];
-    return { nome: p.nome, ultimoPedido: pedidos.length ? pedidos[pedidos.length - 1].data : null };
+    const ultimo = pedidos.length ? pedidos[pedidos.length - 1] : null;
+    return {
+      nome: p.nome,
+      ultimoPedido: ultimo ? ultimo.data : null,
+      ultimoDiagnostico: ultimo ? ultimo.diagnostico : null,
+    };
   });
 }
 

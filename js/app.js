@@ -100,9 +100,13 @@ document.getElementById("close-pacientes").addEventListener("click", () => {
   goToStep(telaAnterior || 1);
 });
 
+let todosPacientes = [];
+
 async function carregarPacientes() {
   const lista = document.getElementById("pacientes-lista");
   const detalhe = document.getElementById("paciente-detalhe");
+  const busca = document.getElementById("busca-paciente");
+  busca.value = "";
   detalhe.style.display = "none";
   detalhe.innerHTML = "";
   lista.style.display = "block";
@@ -111,26 +115,50 @@ async function carregarPacientes() {
   try {
     const resp = await fetch(`${API_BASE}/pacientes`);
     const pacientes = await resp.json();
-
-    if (!Array.isArray(pacientes) || !pacientes.length) {
-      lista.innerHTML = `<p class="suggestion-text">Nenhum paciente registrado ainda — pedidos e laudos com o campo "Paciente" preenchido aparecem aqui.</p>`;
-      return;
-    }
-
-    lista.innerHTML = "";
-    pacientes.forEach((p) => {
-      const card = document.createElement("div");
-      card.className = "card";
-      card.style.cursor = "pointer";
-      const ultimo = p.ultimoPedido ? new Date(p.ultimoPedido).toLocaleDateString("pt-BR") : "sem pedidos ainda";
-      card.innerHTML = `<h3>${p.nome}</h3><p class="suggestion-text">Último pedido: ${ultimo}</p>`;
-      card.addEventListener("click", () => abrirDetalhePaciente(p.nome));
-      lista.appendChild(card);
-    });
+    todosPacientes = Array.isArray(pacientes) ? pacientes : [];
+    renderizarListaPacientes(todosPacientes);
   } catch (err) {
     lista.innerHTML = `<p class="suggestion-text">Não foi possível carregar os pacientes (${err.message}).</p>`;
   }
 }
+
+function renderizarListaPacientes(pacientes) {
+  const lista = document.getElementById("pacientes-lista");
+
+  if (!pacientes.length) {
+    lista.innerHTML = `<p class="suggestion-text">Nenhum paciente encontrado.</p>`;
+    return;
+  }
+
+  lista.innerHTML = "";
+  pacientes.forEach((p) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.style.cursor = "pointer";
+    const ultimo = p.ultimoPedido ? new Date(p.ultimoPedido).toLocaleDateString("pt-BR") : "sem pedidos ainda";
+    card.innerHTML = `
+      <h3>${p.nome}</h3>
+      <p class="suggestion-text">Último pedido: ${ultimo}</p>
+      ${p.ultimoDiagnostico ? `<p class="suggestion-text">${p.ultimoDiagnostico}</p>` : ""}
+    `;
+    card.addEventListener("click", () => abrirDetalhePaciente(p.nome));
+    lista.appendChild(card);
+  });
+}
+
+document.getElementById("busca-paciente").addEventListener("input", (e) => {
+  const termo = e.target.value.trim().toLowerCase();
+  if (!termo) {
+    renderizarListaPacientes(todosPacientes);
+    return;
+  }
+  const filtrados = todosPacientes.filter(
+    (p) =>
+      p.nome.toLowerCase().includes(termo) ||
+      (p.ultimoDiagnostico && p.ultimoDiagnostico.toLowerCase().includes(termo))
+  );
+  renderizarListaPacientes(filtrados);
+});
 
 async function abrirDetalhePaciente(nome) {
   const lista = document.getElementById("pacientes-lista");
