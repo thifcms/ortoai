@@ -150,7 +150,7 @@ async function processarLaudo(file) {
   } catch (err) {
     status.style.display = "flex";
     status.classList.add("erro");
-    status.textContent = "Não foi possível ler o laudo. Tente novamente.";
+    status.textContent = `Não foi possível ler o laudo (${err.message}).`;
   }
 }
 
@@ -201,7 +201,7 @@ async function processarNegativa(file) {
   } catch (err) {
     status.style.display = "flex";
     status.classList.add("erro");
-    status.textContent = "Não foi possível registrar a negativa. Tente novamente.";
+    status.textContent = `Não foi possível registrar a negativa (${err.message}).`;
   }
 }
 

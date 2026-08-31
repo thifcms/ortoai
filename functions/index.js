@@ -63,28 +63,33 @@ function nivelEvidenciaPorTipo(estudos) {
 async function chamarGemini({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    console.error("GEMINI_API_KEY ausente em tempo de execução (process.env.GEMINI_API_KEY está vazio/undefined).");
-    return null;
+    return { texto: null, detalhe: "GEMINI_API_KEY ausente em tempo de execução (revisão: " + (process.env.K_REVISION || "desconhecida") + ")" };
   }
 
   const parts = [{ text: prompt }];
   if (imagemBase64) parts.push({ inline_data: { mime_type: mimeType, data: imagemBase64 } });
 
-  const resp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({ contents: [{ parts }] }),
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({ contents: [{ parts }] }),
+      }
+    );
+    const data = await resp.json();
+    const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!texto) {
+      const detalhe = `HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}`;
+      console.error("Gemini não retornou texto:", detalhe);
+      return { texto: null, detalhe };
     }
-  );
-  const data = await resp.json();
-  const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!texto) {
-    console.error("Gemini não retornou texto. Resposta da API:", JSON.stringify(data));
-    return null;
+    return { texto, detalhe: null };
+  } catch (err) {
+    console.error("Erro de rede ao chamar Gemini:", err.message);
+    return { texto: null, detalhe: `Erro de rede: ${err.message}` };
   }
-  return texto;
 }
 
 async function sintetizarComGemini({ diagnostico, material, estudos, exemplos, negativas }) {
@@ -120,9 +125,9 @@ Não invente estudo que não foi listado. NUNCA sugira um material alternativo, 
 o material informado é fixo (parceria comercial do cirurgião) e sua única função é comprovar cientificamente
 a necessidade dele, não questioná-lo ou substituí-lo.`;
 
-  const texto = await chamarGemini({ prompt });
+  const { texto, detalhe } = await chamarGemini({ prompt });
   if (texto) return texto;
-  return `[Configure GEMINI_API_KEY] Estudos encontrados para "${material}": ${estudos
+  return `[DEMONSTRAÇÃO — ${detalhe}] Estudos encontrados para "${material}": ${estudos
     .map((e) => e.titulo)
     .join("; ")}`;
 }
@@ -210,13 +215,13 @@ DIAGNOSTICO_SUGERIDO:
 LAUDO:
 INCOERÊNCIAS:`;
 
-    const texto = await chamarGemini({ prompt, imagemBase64, mimeType });
+    const { texto, detalhe } = await chamarGemini({ prompt, imagemBase64, mimeType });
     if (!texto) {
       return res.status(200).json({
         demo: true,
         nomePaciente: null,
         diagnosticoSugerido: null,
-        textoExtraido: "[Configure GEMINI_API_KEY para ativar a leitura real do laudo]",
+        textoExtraido: `[Modo demonstração] ${detalhe}`,
         incoerencias: [],
       });
     }
@@ -256,8 +261,8 @@ app.post("/negativa", async (req, res) => {
 referente a uma solicitação cirúrgica. Extraia, em até 3 frases e em português, o motivo alegado
 pelo convênio para a negativa. Seja literal ao motivo, sem interpretar além do que está escrito.`;
 
-    const motivo = await chamarGemini({ prompt, imagemBase64, mimeType });
-    const motivoFinal = motivo || "[Configure GEMINI_API_KEY para extrair o motivo automaticamente]";
+    const { texto: motivo, detalhe } = await chamarGemini({ prompt, imagemBase64, mimeType });
+    const motivoFinal = motivo || `[Modo demonstração] ${detalhe}`;
 
     await store.salvarNegativa({ hospital, convenio, codigo, material, motivo: motivoFinal });
 
@@ -292,6 +297,13 @@ app.post("/pacote", async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/health", (_req, res) =>
+  res.json({
+    status: "ok",
+    revisao: process.env.K_REVISION || "desconhecida",
+    geminiConfigurado: !!process.env.GEMINI_API_KEY,
+    pubmedConfigurado: !!process.env.PUBMED_API_KEY,
+  })
+);
 
 exports.api = onRequest(app);
