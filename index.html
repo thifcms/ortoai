@@ -19,7 +19,10 @@
         <div class="brand">OrtoAI <small>Joelho · Evidência</small></div>
         <div class="tagline">Justificativa científica para reduzir glosas</div>
       </div>
-      <button class="btn-icon" id="open-negativa" aria-label="Registrar negativa recebida" title="Registrar negativa recebida">⚠</button>
+      <div style="display:flex; gap:8px;">
+        <button class="btn-icon" id="open-pacientes" aria-label="Ver pacientes" title="Ver pacientes">👤</button>
+        <button class="btn-icon" id="open-negativa" aria-label="Registrar negativa recebida" title="Registrar negativa recebida">⚠</button>
+      </div>
     </div>
   </header>
 
@@ -103,6 +106,15 @@
     <button class="btn-ghost" id="back-to-2">Ajustar código / material</button>
   </section>
 
+  <!-- Tela extra — Pacientes -->
+  <section class="screen" id="screen-pacientes">
+    <h2 class="screen-title">Pacientes</h2>
+    <p class="screen-subtitle">Histórico de pedidos e laudos por paciente.</p>
+    <div id="pacientes-lista"><p class="suggestion-text">Carregando...</p></div>
+    <div id="paciente-detalhe" style="display:none;"></div>
+    <button class="btn-ghost" id="close-pacientes">Fechar</button>
+  </section>
+
   <!-- Tela extra — Registrar negativa recebida -->
   <section class="screen" id="screen-negativa">
     <h2 class="screen-title">Registrar negativa recebida</h2>
@@ -147,6 +159,7 @@
   <button class="btn-primary" id="copy-text">Copiar texto para o pedido</button>
 </div>
 
+<script src="js/tuss-data.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

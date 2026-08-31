@@ -85,6 +85,105 @@ document.getElementById("close-negativa").addEventListener("click", () => {
   goToStep(telaAnterior || 1);
 });
 
+// ---------- Tela de pacientes ----------
+document.getElementById("open-pacientes").addEventListener("click", async () => {
+  telaAnterior = [...document.querySelectorAll(".screen")].findIndex((s) => s.classList.contains("active")) + 1;
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  document.getElementById("screen-pacientes").classList.add("active");
+  mainRail.style.display = "none";
+  document.getElementById("bottom-bar").style.display = "none";
+  await carregarPacientes();
+});
+
+document.getElementById("close-pacientes").addEventListener("click", () => {
+  mainRail.style.display = "flex";
+  goToStep(telaAnterior || 1);
+});
+
+async function carregarPacientes() {
+  const lista = document.getElementById("pacientes-lista");
+  const detalhe = document.getElementById("paciente-detalhe");
+  detalhe.style.display = "none";
+  detalhe.innerHTML = "";
+  lista.style.display = "block";
+  lista.innerHTML = `<p class="suggestion-text">Carregando...</p>`;
+
+  try {
+    const resp = await fetch(`${API_BASE}/pacientes`);
+    const pacientes = await resp.json();
+
+    if (!Array.isArray(pacientes) || !pacientes.length) {
+      lista.innerHTML = `<p class="suggestion-text">Nenhum paciente registrado ainda — pedidos e laudos com o campo "Paciente" preenchido aparecem aqui.</p>`;
+      return;
+    }
+
+    lista.innerHTML = "";
+    pacientes.forEach((p) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.style.cursor = "pointer";
+      const ultimo = p.ultimoPedido ? new Date(p.ultimoPedido).toLocaleDateString("pt-BR") : "sem pedidos ainda";
+      card.innerHTML = `<h3>${p.nome}</h3><p class="suggestion-text">Último pedido: ${ultimo}</p>`;
+      card.addEventListener("click", () => abrirDetalhePaciente(p.nome));
+      lista.appendChild(card);
+    });
+  } catch (err) {
+    lista.innerHTML = `<p class="suggestion-text">Não foi possível carregar os pacientes (${err.message}).</p>`;
+  }
+}
+
+async function abrirDetalhePaciente(nome) {
+  const lista = document.getElementById("pacientes-lista");
+  const detalhe = document.getElementById("paciente-detalhe");
+  lista.style.display = "none";
+  detalhe.style.display = "block";
+  detalhe.innerHTML = `<p class="suggestion-text">Carregando...</p>`;
+
+  try {
+    const resp = await fetch(`${API_BASE}/pacientes/${encodeURIComponent(nome)}`);
+    const p = await resp.json();
+
+    const pedidosHtml = (p.pedidos || [])
+      .slice()
+      .reverse()
+      .map(
+        (ped) => `
+      <div class="card">
+        <div class="meta">${new Date(ped.data).toLocaleString("pt-BR")}</div>
+        <p class="suggestion-text">${ped.diagnostico || ""}</p>
+        <p class="suggestion-text">${ped.hospital || ""}${ped.convenio ? " — " + ped.convenio : ""}</p>
+      </div>`
+      )
+      .join("");
+
+    const laudosHtml = (p.laudos || [])
+      .slice()
+      .reverse()
+      .map(
+        (l) => `
+      <div class="card">
+        <div class="meta">${new Date(l.data).toLocaleString("pt-BR")} — laudo lido</div>
+        <p class="suggestion-text">${l.textoExtraido || ""}</p>
+      </div>`
+      )
+      .join("");
+
+    detalhe.innerHTML = `
+      <button class="btn-ghost" id="voltar-lista-pacientes">← Todos os pacientes</button>
+      <h3 style="margin-top:14px;">${p.nome}</h3>
+      <p class="suggestion-text" style="margin-bottom:14px;">Cadastrado em ${new Date(p.criadoEm).toLocaleDateString("pt-BR")}</p>
+      ${pedidosHtml || `<p class="suggestion-text">Nenhum pedido registrado.</p>`}
+      ${laudosHtml}
+    `;
+    document.getElementById("voltar-lista-pacientes").addEventListener("click", () => {
+      detalhe.style.display = "none";
+      lista.style.display = "block";
+    });
+  } catch (err) {
+    detalhe.innerHTML = `<p class="suggestion-text">Não foi possível carregar este paciente (${err.message}).</p>`;
+  }
+}
+
 // ---------- Utilitário: arquivo -> base64 ----------
 function arquivoParaBase64(file) {
   return new Promise((resolve, reject) => {
@@ -227,6 +326,15 @@ function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
   mainInput.placeholder = placeholderMain;
   row.appendChild(mainInput);
 
+  if (withCode && typeof TABELA_TUSS !== "undefined") {
+    const codeInput = row.querySelector(".tuss");
+    codeInput.addEventListener("input", () => {
+      const codigo = codeInput.value.trim();
+      const descricaoConhecida = TABELA_TUSS[codigo];
+      if (descricaoConhecida) mainInput.value = descricaoConhecida;
+    });
+  }
+
   const removeBtn = document.createElement("button");
   removeBtn.type = "button";
   removeBtn.setAttribute("aria-label", "Remover");
@@ -330,6 +438,15 @@ function renderParecer(parecer) {
     alerta.innerHTML = `<span class="badge risk">Atenção — pacote do hospital</span>
       <p class="suggestion-text" style="margin-top:10px;">${parecer.alertaPacote}</p>`;
     container.appendChild(alerta);
+  }
+
+  if (parecer.sugestaoCodigos) {
+    const sugestao = document.createElement("div");
+    sugestao.className = "card";
+    sugestao.style.setProperty("--stagger", proximoAtraso());
+    sugestao.innerHTML = `<span class="badge ok">Sugestão de código</span>
+      <p class="suggestion-text" style="margin-top:10px;">${parecer.sugestaoCodigos}</p>`;
+    container.appendChild(sugestao);
   }
 
   parecer.itens.forEach((item) => {

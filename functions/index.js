@@ -140,6 +140,62 @@ a necessidade dele, não questioná-lo ou substituí-lo.`;
     .join("; ")}`;
 }
 
+// Texto final da solicitação: consolida diagnóstico + códigos + evidência de todos os materiais
+// num único texto corrido, e sugere ajuste de código automaticamente (sem o médico precisar pedir).
+async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens }) {
+  const listaCodigos = codigos.length
+    ? codigos.map((c) => `- ${c.codigo || "(sem código)"}: ${c.descricao}`).join("\n")
+    : "(nenhum código informado)";
+
+  const listaMateriais = itens
+    .map((i) => `- ${i.material} (nível de evidência ${i.nivelEvidencia}): ${i.resumo}`)
+    .join("\n");
+
+  const prompt = `Você é um especialista em cirurgia de joelho auxiliando um cirurgião a montar uma
+solicitação cirúrgica completa para envio ao convênio, com foco em reduzir o risco de glosa e usar os
+códigos TUSS mais adequados à complexidade real do caso (nunca fraudulentos — apenas mais precisos).
+
+Diagnóstico do paciente: ${diagnostico}
+
+Códigos TUSS propostos pelo cirurgião:
+${listaCodigos}
+
+Materiais solicitados, com evidência científica já levantada para cada um:
+${listaMateriais}
+
+Tarefas:
+1. Avalie se os códigos TUSS propostos capturam adequadamente a complexidade dos procedimentos
+   implícitos no diagnóstico. Se outro código (ou código adicional) tende a ser mais adequado ou a
+   resultar em melhor reembolso para esse tipo de caso, sugira — sempre como sugestão para o médico
+   avaliar, nunca afirmando que a mudança já foi aplicada. Se os códigos já parecerem adequados, diga
+   isso claramente. Seja específico mas breve (2-4 frases).
+2. Escreva um texto único e corrido (não uma lista por material), em português, pronto para anexar à
+   solicitação do hospital. Esse texto deve:
+   - Abrir descrevendo a condição clínica do paciente com base no diagnóstico — a patologia, não o material.
+   - Explicar por que o procedimento é necessário para essa condição.
+   - Justificar cientificamente cada material solicitado, integrado ao raciocínio clínico do caso
+     (não uma lista solta de materiais) — cite o nível de evidência já levantado para cada um.
+   - Ter tom técnico-médico, adequado para leitura por auditor de convênio.
+   NUNCA sugira substituir os materiais informados — eles são fixos (parceria comercial do cirurgião).
+
+Responda em português, em duas seções com os títulos exatos, cada uma começando em sua própria linha:
+CODIGOS_SUGERIDOS:
+TEXTO_SOLICITACAO:`;
+
+  const { texto: resposta, detalhe } = await chamarGemini({ prompt });
+  if (!resposta) {
+    return {
+      sugestaoCodigos: null,
+      textoPedido: `[DEMONSTRAÇÃO — ${detalhe}] ${itens.map((i) => i.resumo).join(" ")}`,
+    };
+  }
+
+  const match = resposta.match(/CODIGOS_SUGERIDOS:([\s\S]*?)TEXTO_SOLICITACAO:([\s\S]*)/i);
+  if (!match) return { sugestaoCodigos: null, textoPedido: resposta };
+
+  return { sugestaoCodigos: match[1].trim(), textoPedido: match[2].trim() };
+}
+
 // ---------- Rota principal: gerar parecer ----------
 app.post("/parecer", async (req, res) => {
   try {
@@ -188,13 +244,25 @@ app.post("/parecer", async (req, res) => {
       });
     }
 
-    const textoPedido = itens.map((i) => i.resumo).join(" ");
+    const textoConsolidado = await gerarSolicitacaoConsolidada({ diagnostico, codigos, itens });
 
     if (paciente) {
-      await store.salvarPedidoPaciente(paciente, { diagnostico, hospital, convenio, codigos, materiais, textoPedido });
+      await store.salvarPedidoPaciente(paciente, {
+        diagnostico,
+        hospital,
+        convenio,
+        codigos,
+        materiais,
+        textoPedido: textoConsolidado.textoPedido,
+      });
     }
 
-    res.json({ alertaPacote, itens, textoPedido });
+    res.json({
+      alertaPacote,
+      itens,
+      sugestaoCodigos: textoConsolidado.sugestaoCodigos,
+      textoPedido: textoConsolidado.textoPedido,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erro: "Falha ao gerar parecer." });

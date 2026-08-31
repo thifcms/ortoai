@@ -21,7 +21,6 @@
 button{
   -webkit-tap-highlight-color:transparent;
   transition:transform .15s ease, box-shadow .15s ease, background .2s ease, border-color .2s ease;
-  transform-style:preserve-3d;
 }
 button:active{transform:perspective(400px) rotateX(6deg) scale(0.97) translateZ(-4px);}
 
@@ -156,7 +155,6 @@ body{
   display:block;
   animation:screenIn3D .6s cubic-bezier(.22,1,.36,1);
   transform-origin:50% 0%;
-  transform-style:preserve-3d;
 }
 @keyframes screenIn3D{
   from{
@@ -386,7 +384,6 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   box-shadow:0 8px 24px rgba(16,25,40,0.06);
   opacity:0;
   transform-origin:50% 100%;
-  transform-style:preserve-3d;
   animation:cardIn3D .6s cubic-bezier(.22,1,.36,1) forwards;
   animation-delay:var(--stagger, 0ms);
 }
