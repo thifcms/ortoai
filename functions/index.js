@@ -24,10 +24,7 @@ const GEMINI_MODEL = "gemini-flash-latest"; // alias sempre atualizado — evita
 const CONFIDENCE_AUTONOMOUS = 0.9;
 
 // ---------- PubMed ----------
-async function buscarPubmed(termo) {
-  const filtroEvidencia =
-    '(systematic review[pt] OR meta-analysis[pt] OR randomized controlled trial[pt])';
-  const query = `${termo} AND knee AND ${filtroEvidencia}`;
+async function consultarPubmed(query) {
   const params = new URLSearchParams({
     db: "pubmed",
     retmode: "json",
@@ -54,9 +51,47 @@ async function buscarPubmed(termo) {
   });
 }
 
-function nivelEvidenciaPorTipo(estudos) {
-  if (!estudos.length) return "V";
-  return "II";
+// Busca em estágios, do nível de evidência mais forte para o mais fraco — só desce de nível
+// se o estágio anterior não encontrar nada. Nunca aceita nível IV/V sem antes tentar I-III.
+async function buscarPubmed(termo) {
+  const estagios = [
+    {
+      nivel: "I",
+      filtro: "(systematic review[pt] OR meta-analysis[pt])",
+      restringirJoelho: true,
+    },
+    {
+      nivel: "II",
+      filtro: "(randomized controlled trial[pt])",
+      restringirJoelho: true,
+    },
+    {
+      nivel: "III",
+      filtro: '(comparative study[pt] OR "cohort studies"[mh] OR "case-control studies"[mh])',
+      restringirJoelho: true,
+    },
+    {
+      // mesmos filtros de evidência forte, mas sem restringir a "knee" — o termo do material
+      // já pode ser específico o bastante, e restringir demais pode zerar a busca à toa
+      nivel: "I-III (busca ampliada)",
+      filtro:
+        '(systematic review[pt] OR meta-analysis[pt] OR randomized controlled trial[pt] OR comparative study[pt])',
+      restringirJoelho: false,
+    },
+  ];
+
+  for (const estagio of estagios) {
+    const query = estagio.restringirJoelho
+      ? `${termo} AND knee AND ${estagio.filtro}`
+      : `${termo} AND ${estagio.filtro}`;
+    const estudos = await consultarPubmed(query);
+    if (estudos.length) {
+      const nivel = estagio.nivel.startsWith("I-III") ? "II" : estagio.nivel; // busca ampliada assume nível II por padrão
+      return { estudos, nivelEvidencia: nivel };
+    }
+  }
+
+  return { estudos: [], nivelEvidencia: "V" };
 }
 
 // ---------- Gemini ----------
@@ -226,8 +261,9 @@ app.post("/parecer", async (req, res) => {
         nivelEvidencia = exemploAutonomo.nivelEvidencia || "II";
         estudos = [];
       } else {
-        estudos = await buscarPubmed(m.descricao);
-        nivelEvidencia = nivelEvidenciaPorTipo(estudos);
+        const resultado = await buscarPubmed(m.descricao);
+        estudos = resultado.estudos;
+        nivelEvidencia = resultado.nivelEvidencia;
         resumo = await sintetizarComGemini({ diagnostico, material: m.descricao, estudos, exemplos, negativas });
       }
 
