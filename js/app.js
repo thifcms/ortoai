@@ -430,14 +430,17 @@ async function gerarParecer(payload) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    if (!resp.ok) throw new Error("backend indisponível");
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return await resp.json();
   } catch (err) {
-    return demoParecer(payload);
+    return demoParecer(payload, err.message);
   }
 }
 
-function demoParecer(payload) {
+function demoParecer(payload, motivoErro) {
+  const motivo = motivoErro
+    ? `Não foi possível falar com o servidor (${motivoErro}). Isso costuma ser tempo limite excedido — tente de novo com menos materiais de uma vez, ou aguarde um pouco.`
+    : "Backend ainda não conectado.";
   return {
     demo: true,
     itens: payload.materiais.length
@@ -445,13 +448,11 @@ function demoParecer(payload) {
           material: m.descricao,
           nivelEvidencia: "II",
           badge: "high",
-          resumo:
-            "Backend ainda não conectado — este é um texto de demonstração. Quando o servidor de busca (PubMed + IA) estiver no ar, aqui aparecerá a justificativa real com estudos citados.",
+          resumo: motivo,
         }))
       : [],
     alertaPacote: null,
-    textoPedido:
-      "[Demonstração] Conecte o backend em /api/parecer para gerar o texto real de justificativa, com estudos e nível de evidência, pronto para colar na solicitação do hospital.",
+    textoPedido: `[Demonstração] ${motivo}`,
   };
 }
 

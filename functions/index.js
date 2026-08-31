@@ -13,7 +13,7 @@ const fetch = require("node-fetch");
 const store = require("./store");
 
 admin.initializeApp();
-setGlobalOptions({ region: "southamerica-east1", maxInstances: 10, timeoutSeconds: 180, memory: "512MiB" });
+setGlobalOptions({ region: "southamerica-east1", maxInstances: 10, timeoutSeconds: 300, memory: "512MiB" });
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -69,7 +69,7 @@ async function chamarGemini({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   const parts = [{ text: prompt }];
   if (imagemBase64) parts.push({ inline_data: { mime_type: mimeType, data: imagemBase64 } });
 
-  const tentativas = [0, 1500, 4000]; // sem espera, depois 1.5s, depois 4s
+  const tentativas = [0, 1000, 2000]; // sem espera, depois 1s, depois 2s
   let ultimoErro = null;
 
   for (const espera of tentativas) {
@@ -215,8 +215,7 @@ app.post("/parecer", async (req, res) => {
       }
     }
 
-    const itens = [];
-    for (const m of materiais) {
+    const processarMaterial = async (m) => {
       const exemplos = await store.getExemplos(m.descricao);
       const negativas = convenio ? await store.getNegativas(convenio, m.descricao) : [];
       const exemploAutonomo = exemplos.find((e) => e.confianca >= CONFIDENCE_AUTONOMOUS);
@@ -232,7 +231,7 @@ app.post("/parecer", async (req, res) => {
         resumo = await sintetizarComGemini({ diagnostico, material: m.descricao, estudos, exemplos, negativas });
       }
 
-      itens.push({
+      return {
         material: m.descricao,
         nivelEvidencia,
         badge: nivelEvidencia <= "II" ? "high" : "ok",
@@ -241,8 +240,10 @@ app.post("/parecer", async (req, res) => {
         alertaNegativaAnterior: negativas.length
           ? `Já houve negativa para este material com este convênio — parecer ajustado para tentar evitar repetição.`
           : null,
-      });
-    }
+      };
+    };
+
+    const itens = await Promise.all(materiais.map(processarMaterial));
 
     const textoConsolidado = await gerarSolicitacaoConsolidada({ diagnostico, codigos, itens });
 
