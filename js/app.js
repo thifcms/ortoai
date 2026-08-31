@@ -174,10 +174,21 @@ async function abrirDetalhePaciente(nome) {
       <p class="suggestion-text" style="margin-bottom:14px;">Cadastrado em ${new Date(p.criadoEm).toLocaleDateString("pt-BR")}</p>
       ${pedidosHtml || `<p class="suggestion-text">Nenhum pedido registrado.</p>`}
       ${laudosHtml}
+      <button class="btn-ghost" id="excluir-paciente" style="color:var(--risk); margin-top:20px;">🗑️ Excluir paciente</button>
     `;
     document.getElementById("voltar-lista-pacientes").addEventListener("click", () => {
       detalhe.style.display = "none";
       lista.style.display = "block";
+    });
+    document.getElementById("excluir-paciente").addEventListener("click", async () => {
+      if (!confirm(`Excluir permanentemente "${p.nome}" e todo o histórico de pedidos e laudos? Isso não pode ser desfeito.`)) return;
+      try {
+        await fetch(`${API_BASE}/pacientes/${encodeURIComponent(nome)}`, { method: "DELETE" });
+        detalhe.style.display = "none";
+        await carregarPacientes();
+      } catch (err) {
+        alert(`Não foi possível excluir (${err.message}).`);
+      }
     });
   } catch (err) {
     detalhe.innerHTML = `<p class="suggestion-text">Não foi possível carregar este paciente (${err.message}).</p>`;

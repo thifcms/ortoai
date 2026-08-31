@@ -360,6 +360,11 @@ app.get("/pacientes/:nome", async (req, res) => {
   res.json(paciente);
 });
 
+app.delete("/pacientes/:nome", async (req, res) => {
+  await store.excluirPaciente(req.params.nome);
+  res.json({ ok: true });
+});
+
 // ---------- Aprendizado ----------
 app.post("/confirmar", async (req, res) => {
   const { material, entrada, saida, nivelEvidencia, correto } = req.body;

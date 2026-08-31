@@ -82,6 +82,11 @@ async function salvarLaudoPaciente(nome, laudo) {
   await ref.set(atual);
 }
 
+async function excluirPaciente(nome) {
+  if (!nome) return;
+  await db().collection("pacientes").doc(slug(nome)).delete();
+}
+
 // ---------- Negativas de convênio (aprendizado preventivo) ----------
 async function salvarNegativa({ hospital, convenio, codigo, material, motivo }) {
   const ref = db().collection("negativas").doc(slug(`${convenio}::${material}`));
@@ -105,6 +110,7 @@ module.exports = {
   listarPacientes,
   salvarPedidoPaciente,
   salvarLaudoPaciente,
+  excluirPaciente,
   salvarNegativa,
   getNegativas,
 };
