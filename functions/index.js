@@ -69,27 +69,35 @@ async function chamarGemini({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   const parts = [{ text: prompt }];
   if (imagemBase64) parts.push({ inline_data: { mime_type: mimeType, data: imagemBase64 } });
 
-  try {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({ contents: [{ parts }] }),
-      }
-    );
-    const data = await resp.json();
-    const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-    if (!texto) {
-      const detalhe = `HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}`;
-      console.error("Gemini não retornou texto:", detalhe);
-      return { texto: null, detalhe };
+  const tentativas = [0, 1500, 4000]; // sem espera, depois 1.5s, depois 4s
+  let ultimoErro = null;
+
+  for (const espera of tentativas) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    try {
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          body: JSON.stringify({ contents: [{ parts }] }),
+        }
+      );
+      const data = await resp.json();
+      const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (texto) return { texto, detalhe: null };
+
+      ultimoErro = `HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}`;
+      // Só vale a pena tentar de novo se for sobrecarga temporária (503) ou limite de taxa (429)
+      if (resp.status !== 503 && resp.status !== 429) break;
+      console.warn(`Gemini sobrecarregado (${resp.status}), tentando de novo...`);
+    } catch (err) {
+      ultimoErro = `Erro de rede: ${err.message}`;
     }
-    return { texto, detalhe: null };
-  } catch (err) {
-    console.error("Erro de rede ao chamar Gemini:", err.message);
-    return { texto: null, detalhe: `Erro de rede: ${err.message}` };
   }
+
+  console.error("Gemini falhou após tentativas:", ultimoErro);
+  return { texto: null, detalhe: ultimoErro };
 }
 
 async function sintetizarComGemini({ diagnostico, material, estudos, exemplos, negativas }) {
