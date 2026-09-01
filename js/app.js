@@ -386,7 +386,7 @@ function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
 }
 
 // ---------- Sugestão automática de código por tipo de cirurgia ----------
-function aplicarSugestaoCirurgia(tipo) {
+async function aplicarSugestaoCirurgia(tipo) {
   document.getElementById("tipo-aberta").classList.toggle("ativo-tipo", tipo === "aberta");
   document.getElementById("tipo-artro").classList.toggle("ativo-tipo", tipo === "artroscopica");
   document.getElementById("tipo-bloqueio").classList.toggle("ativo-tipo", tipo === "bloqueio");
@@ -401,7 +401,26 @@ function aplicarSugestaoCirurgia(tipo) {
     return;
   }
 
-  const sugestoes = typeof sugerirCodigosTuss === "function" ? sugerirCodigosTuss(diagnostico, tipo) : [];
+  let sugestoes = [];
+
+  if (tipo === "bloqueio") {
+    status.style.display = "flex";
+    status.classList.remove("erro");
+    status.textContent = "Analisando diagnóstico para escolher os nervos mais adequados...";
+    try {
+      const resp = await fetch(`${API_BASE}/sugerir-bloqueio`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diagnostico }),
+      });
+      const data = await resp.json();
+      sugestoes = data.codigos || [];
+    } catch (err) {
+      sugestoes = typeof sugerirCodigosTuss === "function" ? sugerirCodigosTuss(diagnostico, tipo) : [];
+    }
+  } else {
+    sugestoes = typeof sugerirCodigosTuss === "function" ? sugerirCodigosTuss(diagnostico, tipo) : [];
+  }
 
   const codeList = document.getElementById("code-list");
   codeList.innerHTML = "";

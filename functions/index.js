@@ -457,6 +457,63 @@ diretamente em "PACIENTE:", sem nenhum texto antes.`;
 });
 
 // ---------- Registrar negativa de convênio por foto ----------
+// ---------- Sugestão de bloqueio de nervo periférico por IA (restrita a opções válidas) ----------
+const NERVOS_VALIDOS_JOELHO = [
+  "nervo femoral",
+  "nervo obturador",
+  "nervo safeno (canal dos adutores)",
+  "nervo ciático (região poplítea)",
+  "nervos geniculares",
+];
+
+app.post("/sugerir-bloqueio", async (req, res) => {
+  try {
+    const { diagnostico, laudoTexto } = req.body;
+    if (!diagnostico) return res.status(400).json({ erro: "Informe o diagnóstico." });
+
+    const prompt = `Você é um ortopedista especialista em joelho decidindo quais nervos periféricos
+bloquear para analgesia/anestesia de uma cirurgia de joelho, com base no diagnóstico do paciente.
+
+Diagnóstico: ${diagnostico}
+${laudoTexto ? `Achados do laudo de imagem: ${laudoTexto}` : ""}
+
+Escolha SOMENTE entre estas opções (nunca cite outro nervo fora desta lista):
+${NERVOS_VALIDOS_JOELHO.map((n) => `- ${n}`).join("\n")}
+
+Selecione de 1 a 3 nervos clinicamente adequados para este caso (não escolha todos por padrão —
+só os que fazem sentido para a patologia e a extensão do procedimento implícito no diagnóstico).
+
+Responda em português, apenas com a lista escolhida, um nervo por linha, cada linha começando com
+"- ", usando exatamente o texto das opções acima. Não escreva mais nada além da lista — sem
+explicação, sem raciocínio, sem texto antes ou depois.`;
+
+    const { texto, detalhe } = await chamarIA({ prompt });
+
+    let nervosEscolhidos = [];
+    if (texto) {
+      nervosEscolhidos = texto
+        .split("\n")
+        .map((l) => l.replace(/^[-•\s]+/, "").trim().toLowerCase())
+        .filter((l) => NERVOS_VALIDOS_JOELHO.some((n) => n.toLowerCase() === l));
+    }
+
+    // Se a IA falhou ou não retornou nada válido, cai num padrão seguro (os 3 mais comuns em joelho)
+    if (!nervosEscolhidos.length) {
+      nervosEscolhidos = ["nervo femoral", "nervo obturador", "nervo safeno (canal dos adutores)"];
+    }
+
+    const codigos = nervosEscolhidos.map((nervo) => {
+      const nomeOriginal = NERVOS_VALIDOS_JOELHO.find((n) => n.toLowerCase() === nervo) || nervo;
+      return { codigo: "31602118", descricao: `Bloqueio de nervo periférico (${nomeOriginal})` };
+    });
+
+    res.json({ codigos, demo: !texto, detalhe: texto ? null : detalhe });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: "Falha ao sugerir bloqueio." });
+  }
+});
+
 app.post("/negativa", async (req, res) => {
   try {
     const { hospital, convenio, codigo, material, imagemBase64, mimeType } = req.body;
