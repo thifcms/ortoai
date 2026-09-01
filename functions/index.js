@@ -100,44 +100,84 @@ async function buscarPubmed(termo) {
 }
 
 // ---------- Gemini ----------
-async function chamarGemini({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
+// Groq como fallback gratuito quando o Gemini estiver sobrecarregado ou sem cota (mesmo padrão já usado na Audit AI).
+const GROQ_TEXT_MODEL = "llama-3.3-70b-versatile";
+const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+
+async function chamarGroq({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) return { texto: null, detalhe: "GROQ_API_KEY não configurada (fallback indisponível)" };
+
+  const content = imagemBase64
+    ? [
+        { type: "text", text: prompt },
+        { type: "image_url", image_url: { url: `data:${mimeType};base64,${imagemBase64}` } },
+      ]
+    : prompt;
+
+  try {
+    const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: imagemBase64 ? GROQ_VISION_MODEL : GROQ_TEXT_MODEL,
+        messages: [{ role: "user", content }],
+      }),
+    });
+    const data = await resp.json();
+    const texto = data?.choices?.[0]?.message?.content?.trim();
+    if (texto) return { texto, detalhe: null };
+    return { texto: null, detalhe: `Groq HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}` };
+  } catch (err) {
+    return { texto: null, detalhe: `Erro de rede no Groq: ${err.message}` };
+  }
+}
+
+// Tenta o Gemini primeiro (com retry em sobrecarga/limite); se esgotar as tentativas ou faltar
+// a chave, cai automaticamente para o Groq (gratuito) como fallback — mesmo padrão da Audit AI.
+async function chamarIA({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return { texto: null, detalhe: "GEMINI_API_KEY ausente em tempo de execução (revisão: " + (process.env.K_REVISION || "desconhecida") + ")" };
-  }
 
-  const parts = [{ text: prompt }];
-  if (imagemBase64) parts.push({ inline_data: { mime_type: mimeType, data: imagemBase64 } });
+  if (apiKey) {
+    const tentativas = [0, 1000, 2000]; // sem espera, depois 1s, depois 2s
+    let ultimoErro = null;
 
-  const tentativas = [0, 1000, 2000]; // sem espera, depois 1s, depois 2s
-  let ultimoErro = null;
+    for (const espera of tentativas) {
+      if (espera) await new Promise((r) => setTimeout(r, espera));
+      try {
+        const parts = [{ text: prompt }];
+        if (imagemBase64) parts.push({ inline_data: { mime_type: mimeType, data: imagemBase64 } });
 
-  for (const espera of tentativas) {
-    if (espera) await new Promise((r) => setTimeout(r, espera));
-    try {
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          body: JSON.stringify({ contents: [{ parts }] }),
-        }
-      );
-      const data = await resp.json();
-      const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-      if (texto) return { texto, detalhe: null };
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+            body: JSON.stringify({ contents: [{ parts }] }),
+          }
+        );
+        const data = await resp.json();
+        const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (texto) return { texto, detalhe: null, provedor: "gemini" };
 
-      ultimoErro = `HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}`;
-      // Só vale a pena tentar de novo se for sobrecarga temporária (503) ou limite de taxa (429)
-      if (resp.status !== 503 && resp.status !== 429) break;
-      console.warn(`Gemini sobrecarregado (${resp.status}), tentando de novo...`);
-    } catch (err) {
-      ultimoErro = `Erro de rede: ${err.message}`;
+        ultimoErro = `HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}`;
+        // Cota esgotada (429) já pode tentar o fallback direto, sem insistir no Gemini
+        if (resp.status === 429) break;
+        if (resp.status !== 503) break;
+        console.warn(`Gemini sobrecarregado (${resp.status}), tentando de novo...`);
+      } catch (err) {
+        ultimoErro = `Erro de rede: ${err.message}`;
+      }
     }
+    console.warn("Gemini falhou, caindo para o Groq:", ultimoErro);
+  } else {
+    console.warn("GEMINI_API_KEY ausente, indo direto para o Groq.");
   }
 
-  console.error("Gemini falhou após tentativas:", ultimoErro);
-  return { texto: null, detalhe: ultimoErro };
+  const resultadoGroq = await chamarGroq({ prompt, imagemBase64, mimeType });
+  if (resultadoGroq.texto) return { texto: resultadoGroq.texto, detalhe: null, provedor: "groq" };
+
+  return { texto: null, detalhe: resultadoGroq.detalhe, provedor: null };
 }
 
 async function sintetizarComGemini({ diagnostico, material, estudos, exemplos, negativas }) {
@@ -175,7 +215,7 @@ diga isso com honestidade em vez de citar algo inexistente. NUNCA sugira um mate
 ou de outra marca — o material informado é fixo (parceria comercial do cirurgião) e sua única função é
 comprovar cientificamente a necessidade dele, não questioná-lo ou substituí-lo.`;
 
-  const { texto, detalhe } = await chamarGemini({ prompt });
+  const { texto, detalhe } = await chamarIA({ prompt });
   if (texto) return texto;
   return `[DEMONSTRAÇÃO — ${detalhe}] Estudos encontrados para "${material}": ${estudos
     .map((e) => e.titulo)
@@ -242,7 +282,7 @@ Responda em português, em duas seções com os títulos exatos, cada uma começ
 CODIGOS_SUGERIDOS:
 TEXTO_SOLICITACAO:`;
 
-  const { texto: resposta, detalhe } = await chamarGemini({ prompt });
+  const { texto: resposta, detalhe } = await chamarIA({ prompt });
   if (!resposta) {
     return {
       sugestaoCodigos: null,
@@ -360,7 +400,7 @@ DIAGNOSTICO_SUGERIDO:
 LAUDO:
 INCOERÊNCIAS:`;
 
-    const { texto, detalhe } = await chamarGemini({ prompt, imagemBase64, mimeType });
+    const { texto, detalhe } = await chamarIA({ prompt, imagemBase64, mimeType });
     if (!texto) {
       return res.status(200).json({
         demo: true,
@@ -406,7 +446,7 @@ app.post("/negativa", async (req, res) => {
 referente a uma solicitação cirúrgica. Extraia, em até 3 frases e em português, o motivo alegado
 pelo convênio para a negativa. Seja literal ao motivo, sem interpretar além do que está escrito.`;
 
-    const { texto: motivo, detalhe } = await chamarGemini({ prompt, imagemBase64, mimeType });
+    const { texto: motivo, detalhe } = await chamarIA({ prompt, imagemBase64, mimeType });
     const motivoFinal = motivo || `[Modo demonstração] ${detalhe}`;
 
     await store.salvarNegativa({ hospital, convenio, codigo, material, motivo: motivoFinal });
