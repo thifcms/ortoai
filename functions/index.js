@@ -246,17 +246,10 @@ TEXTO_SOLICITACAO:`;
   }
 
   const match = resposta.match(/CODIGOS_SUGERIDOS:([\s\S]*?)TEXTO_SOLICITACAO:([\s\S]*)/i);
-  if (!match) return { sugestaoCodigos: null, textoPedido: resposta + BASE_LEGAL };
+  if (!match) return { sugestaoCodigos: null, textoPedido: resposta };
 
-  return { sugestaoCodigos: match[1].trim(), textoPedido: match[2].trim() + BASE_LEGAL };
+  return { sugestaoCodigos: match[1].trim(), textoPedido: match[2].trim() };
 }
-
-// Rodapé fixo (não gerado pela IA, para garantir que a citação legal esteja sempre correta).
-const BASE_LEGAL =
-  "\n\nRessalta-se que, nos termos do art. 7º da Resolução Normativa nº 424/2017 da ANS, " +
-  "cabe ao médico assistente — e não à operadora — determinar o tipo, a matéria-prima e as " +
-  "dimensões do material necessário ao procedimento. A Resolução CFM nº 2.318/2022 reforça essa " +
-  "prerrogativa, vedando a substituição da especificação técnica do médico assistente.";
 
 // ---------- Rota principal: gerar parecer ----------
 app.post("/parecer", async (req, res) => {
