@@ -80,18 +80,23 @@ async function buscarPubmed(termo) {
     },
   ];
 
-  for (const estagio of estagios) {
-    const query = estagio.restringirJoelho
-      ? `${termo} AND knee AND ${estagio.filtro}`
-      : `${termo} AND ${estagio.filtro}`;
-    const estudos = await consultarPubmed(query);
-    if (estudos.length) {
-      const nivel = estagio.nivel.startsWith("I-III") ? "II" : estagio.nivel; // busca ampliada assume nível II por padrão
-      return { estudos, nivelEvidencia: nivel };
-    }
-  }
+  // Roda todos os estágios em paralelo (não sequencial) — mesma qualidade de busca, bem mais rápido.
+  const resultados = await Promise.all(
+    estagios.map(async (estagio) => {
+      const query = estagio.restringirJoelho
+        ? `${termo} AND knee AND ${estagio.filtro}`
+        : `${termo} AND ${estagio.filtro}`;
+      const estudos = await consultarPubmed(query);
+      const nivel = estagio.nivel.startsWith("I-III") ? "II" : estagio.nivel;
+      return { estudos, nivelEvidencia: nivel, ordem: estagios.indexOf(estagio) };
+    })
+  );
 
-  return { estudos: [], nivelEvidencia: "V" };
+  const melhor = resultados
+    .filter((r) => r.estudos.length)
+    .sort((a, b) => a.ordem - b.ordem)[0];
+
+  return melhor ? { estudos: melhor.estudos, nivelEvidencia: melhor.nivelEvidencia } : { estudos: [], nivelEvidencia: "V" };
 }
 
 // ---------- Gemini ----------
