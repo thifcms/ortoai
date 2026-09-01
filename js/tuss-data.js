@@ -264,6 +264,9 @@ const TABELA_TUSS = {
   "30710022": "Retirada de material de síntese - fios, pinos, parafusos ou hastes metálicas intra-ósseas",
   "30710057": "Retirada de fixadores externos",
   "31602118": "Bloqueio de nervo periférico",
+  "31602339": "Bloqueio anestésico de plexos nervosos (lombossacro, braquial, cervical) para tratamento de dor",
+  "31602223": "Passagem de cateter peridural ou subaracnóideo com bloqueio de prova",
+  "31602029": "Analgesia por dia subsequente",
 };
 
 // ---------- Sugestão de códigos por diagnóstico + tipo de cirurgia ----------
@@ -306,9 +309,10 @@ function sugerirCodigosTuss(diagnostico, tipoCirurgia) {
   if (!diagNorm) return [];
 
   if (tipoCirurgia === "bloqueio") {
-    return Object.entries(TABELA_TUSS)
-      .filter(([, descricao]) => tussNormalizar(descricao).includes("bloqueio"))
-      .map(([codigo, descricao]) => ({ codigo, descricao }));
+    const codigosBloqueio = ["31602118", "31602339", "31602223", "31602029"];
+    return codigosBloqueio
+      .filter((codigo) => TABELA_TUSS[codigo])
+      .map((codigo) => ({ codigo, descricao: TABELA_TUSS[codigo] }));
   }
 
   const ehArtroscopica = tipoCirurgia === "artroscopica";
