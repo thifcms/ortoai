@@ -162,11 +162,13 @@ ${contextoNegativas}
 
 Escreva um parecer curto (máximo 4 frases), em português, objetivo e técnico, que:
 - afirme a necessidade clínica do material informado, exatamente como foi especificado, com base no diagnóstico,
-- cite o nível de evidência dos estudos encontrados,
+- CITE EXPLICITAMENTE pelo menos um estudo da lista acima, no formato "(periódico, ano — PMID: xxxxx)" —
+  nunca apenas mencione "nível de evidência X" sem apontar qual estudo sustenta a afirmação,
 - use linguagem adequada para anexar a uma solicitação hospitalar.
-Não invente estudo que não foi listado. NUNCA sugira um material alternativo, genérico ou de outra marca —
-o material informado é fixo (parceria comercial do cirurgião) e sua única função é comprovar cientificamente
-a necessidade dele, não questioná-lo ou substituí-lo.`;
+Não invente estudo, periódico, ano ou PMID que não esteja na lista acima. Se não houver estudo na lista,
+diga isso com honestidade em vez de citar algo inexistente. NUNCA sugira um material alternativo, genérico
+ou de outra marca — o material informado é fixo (parceria comercial do cirurgião) e sua única função é
+comprovar cientificamente a necessidade dele, não questioná-lo ou substituí-lo.`;
 
   const { texto, detalhe } = await chamarGemini({ prompt });
   if (texto) return texto;
@@ -183,7 +185,14 @@ async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens }) {
     : "(nenhum código informado)";
 
   const listaMateriais = itens
-    .map((i) => `- ${i.material} (nível de evidência ${i.nivelEvidencia}): ${i.resumo}`)
+    .map((i) => {
+      const estudosFormatados = i.estudos.length
+        ? i.estudos
+            .map((e) => `    · ${e.titulo} — ${e.fonte || "periódico não informado"}, ${e.ano || "s/ data"} (PMID: ${e.pmid})`)
+            .join("\n")
+        : "    · Nenhum estudo específico encontrado nesta busca.";
+      return `- ${i.material} (nível de evidência ${i.nivelEvidencia})\n  Estudos disponíveis para citação:\n${estudosFormatados}`;
+    })
     .join("\n");
 
   const prompt = `Você é um especialista em cirurgia de joelho auxiliando um cirurgião a montar uma
@@ -195,7 +204,7 @@ Diagnóstico do paciente: ${diagnostico}
 Códigos TUSS propostos pelo cirurgião:
 ${listaCodigos}
 
-Materiais solicitados, com evidência científica já levantada para cada um:
+Materiais solicitados, com os estudos científicos já levantados no PubMed para cada um:
 ${listaMateriais}
 
 Tarefas:
@@ -209,7 +218,13 @@ Tarefas:
    - Abrir descrevendo a condição clínica do paciente com base no diagnóstico — a patologia, não o material.
    - Explicar por que o procedimento é necessário para essa condição.
    - Justificar cientificamente cada material solicitado, integrado ao raciocínio clínico do caso
-     (não uma lista solta de materiais) — cite o nível de evidência já levantado para cada um.
+     (não uma lista solta de materiais).
+   - CITAR EXPLICITAMENTE pelo menos um estudo por material, no formato
+     "(periódico, ano — PMID: xxxxx)", usando exclusivamente os estudos listados acima. Essa citação
+     nominal é essencial: o texto precisa resistir a questionamento de auditor, então nunca afirme
+     "há evidência de nível X" sem apontar exatamente qual estudo sustenta essa afirmação.
+   - Se um material não tiver estudo disponível na lista, diga isso com honestidade em vez de inventar
+     uma citação — nunca cite um estudo, periódico, ano ou PMID que não esteja listado acima.
    - Ter tom técnico-médico, adequado para leitura por auditor de convênio.
    NUNCA sugira substituir os materiais informados — eles são fixos (parceria comercial do cirurgião).
 
