@@ -389,6 +389,7 @@ function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
 function aplicarSugestaoCirurgia(tipo) {
   document.getElementById("tipo-aberta").classList.toggle("ativo-tipo", tipo === "aberta");
   document.getElementById("tipo-artro").classList.toggle("ativo-tipo", tipo === "artroscopica");
+  document.getElementById("tipo-bloqueio").classList.toggle("ativo-tipo", tipo === "bloqueio");
 
   const diagnostico = document.getElementById("diagnostico").value.trim();
   const status = document.getElementById("sugestao-codigos-status");
@@ -427,6 +428,7 @@ function aplicarSugestaoCirurgia(tipo) {
 
 document.getElementById("tipo-aberta").addEventListener("click", () => aplicarSugestaoCirurgia("aberta"));
 document.getElementById("tipo-artro").addEventListener("click", () => aplicarSugestaoCirurgia("artroscopica"));
+document.getElementById("tipo-bloqueio").addEventListener("click", () => aplicarSugestaoCirurgia("bloqueio"));
 
 document.getElementById("add-code").addEventListener("click", () => {
   addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });

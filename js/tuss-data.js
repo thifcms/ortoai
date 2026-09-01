@@ -263,6 +263,7 @@ const TABELA_TUSS = {
   "30710030": "Retirada de material de síntese - placas",
   "30710022": "Retirada de material de síntese - fios, pinos, parafusos ou hastes metálicas intra-ósseas",
   "30710057": "Retirada de fixadores externos",
+  "31602118": "Bloqueio de nervo periférico",
 };
 
 // ---------- Sugestão de códigos por diagnóstico + tipo de cirurgia ----------
@@ -303,6 +304,12 @@ const TUSS_PALAVRAS_IGNORAR = new Set([
 function sugerirCodigosTuss(diagnostico, tipoCirurgia) {
   const diagNorm = tussNormalizar(diagnostico || "");
   if (!diagNorm) return [];
+
+  if (tipoCirurgia === "bloqueio") {
+    return Object.entries(TABELA_TUSS)
+      .filter(([, descricao]) => tussNormalizar(descricao).includes("bloqueio"))
+      .map(([codigo, descricao]) => ({ codigo, descricao }));
+  }
 
   const ehArtroscopica = tipoCirurgia === "artroscopica";
 
