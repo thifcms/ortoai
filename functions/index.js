@@ -280,7 +280,10 @@ Tarefas:
 
 Responda em português, em duas seções com os títulos exatos, cada uma começando em sua própria linha:
 CODIGOS_SUGERIDOS:
-TEXTO_SOLICITACAO:`;
+TEXTO_SOLICITACAO:
+
+IMPORTANTE: não mostre seu raciocínio, rascunho ou processo de análise — comece a resposta
+diretamente em "CODIGOS_SUGERIDOS:", sem nenhum texto antes.`;
 
   const { texto: resposta, detalhe } = await chamarIA({ prompt });
   if (!resposta) {
@@ -291,7 +294,13 @@ TEXTO_SOLICITACAO:`;
   }
 
   const match = resposta.match(/CODIGOS_SUGERIDOS:([\s\S]*?)TEXTO_SOLICITACAO:([\s\S]*)/i);
-  if (!match) return { sugestaoCodigos: null, textoPedido: resposta };
+  if (!match) {
+    console.error("IA não seguiu o formato esperado na consolidação (possível raciocínio vazado):", resposta.slice(0, 500));
+    return {
+      sugestaoCodigos: null,
+      textoPedido: "[Modo demonstração] A IA retornou um formato inesperado (provável raciocínio interno do modelo). Tente gerar o parecer de novo.",
+    };
+  }
 
   return { sugestaoCodigos: match[1].trim(), textoPedido: match[2].trim() };
 }
@@ -398,7 +407,10 @@ Responda em português, em quatro seções com os títulos exatos, cada uma em s
 PACIENTE:
 DIAGNOSTICO_SUGERIDO:
 LAUDO:
-INCOERÊNCIAS:`;
+INCOERÊNCIAS:
+
+IMPORTANTE: não mostre seu raciocínio, rascunho ou processo de análise — comece a resposta
+diretamente em "PACIENTE:", sem nenhum texto antes.`;
 
     const { texto, detalhe } = await chamarIA({ prompt, imagemBase64, mimeType });
     if (!texto) {
@@ -411,9 +423,22 @@ INCOERÊNCIAS:`;
       });
     }
 
-    const match =
-      texto.match(/PACIENTE:([\s\S]*?)DIAGNOSTICO_SUGERIDO:([\s\S]*?)LAUDO:([\s\S]*?)INCOERÊNCIAS:([\s\S]*)/i) || [];
-    const [, pacienteBruto = "", diagnosticoBruto = "", laudoBruto = texto, incoerenciasBruto = ""] = match;
+    const match = texto.match(
+      /PACIENTE:([\s\S]*?)DIAGNOSTICO_SUGERIDO:([\s\S]*?)LAUDO:([\s\S]*?)INCOERÊNCIAS:([\s\S]*)/i
+    );
+
+    if (!match) {
+      console.error("IA não seguiu o formato esperado (possível raciocínio vazado):", texto.slice(0, 500));
+      return res.status(200).json({
+        demo: true,
+        nomePaciente: null,
+        diagnosticoSugerido: null,
+        textoExtraido: "[Modo demonstração] A IA retornou um formato inesperado (provável raciocínio interno do modelo em vez da resposta final). Tente de novo — normalmente resolve na segunda tentativa.",
+        incoerencias: [],
+      });
+    }
+
+    const [, pacienteBruto, diagnosticoBruto, laudoBruto, incoerenciasBruto] = match;
 
     const incoerencias = incoerenciasBruto
       .split("\n")
@@ -444,7 +469,8 @@ app.post("/negativa", async (req, res) => {
 
     const prompt = `Você recebeu a foto de uma carta/laudo de negativa (glosa) de convênio de saúde
 referente a uma solicitação cirúrgica. Extraia, em até 3 frases e em português, o motivo alegado
-pelo convênio para a negativa. Seja literal ao motivo, sem interpretar além do que está escrito.`;
+pelo convênio para a negativa. Seja literal ao motivo, sem interpretar além do que está escrito.
+IMPORTANTE: responda apenas com as 3 frases finais — não mostre seu raciocínio ou processo de análise.`;
 
     const { texto: motivo, detalhe } = await chamarIA({ prompt, imagemBase64, mimeType });
     const motivoFinal = motivo || `[Modo demonstração] ${detalhe}`;
