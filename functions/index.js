@@ -161,10 +161,7 @@ async function chamarIA({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
         if (texto) return { texto, detalhe: null, provedor: "gemini" };
 
         ultimoErro = `HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}`;
-        // Cota esgotada (429) já pode tentar o fallback direto, sem insistir no Gemini
-        if (resp.status === 429) break;
-        if (resp.status !== 503) break;
-        console.warn(`Gemini sobrecarregado (${resp.status}), tentando de novo...`);
+        console.warn(`Gemini falhou (${resp.status}), tentando de novo...`);
       } catch (err) {
         ultimoErro = `Erro de rede: ${err.message}`;
       }
