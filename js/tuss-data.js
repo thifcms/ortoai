@@ -264,3 +264,73 @@ const TABELA_TUSS = {
   "30710022": "Retirada de material de síntese - fios, pinos, parafusos ou hastes metálicas intra-ósseas",
   "30710057": "Retirada de fixadores externos",
 };
+
+// ---------- Sugestão de códigos por diagnóstico + tipo de cirurgia ----------
+// Só sugere códigos que já existem na TABELA_TUSS acima — nunca inventa código.
+
+function tussNormalizar(s) {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+// Termos clínicos comuns -> fragmentos que costumam aparecer na descrição TUSS correspondente.
+const TUSS_PALAVRAS_CHAVE = [
+  { termos: ["ligamento cruzado anterior", "lca"], fragmentos: ["ligamento cruzado anterior", "pivot central"] },
+  { termos: ["ligamento cruzado posterior", "lcp"], fragmentos: ["ligamento cruzado anterior", "pivot central"] },
+  { termos: ["menisco", "meniscal"], fragmentos: ["menisc"] },
+  { termos: ["cartilagem", "condral", "condromalacia", "osteocondral"], fragmentos: ["condroplastia", "osteocondroplastia", "condral"] },
+  { termos: ["corpo livre", "corpo estranho"], fragmentos: ["corpo estranho intra-articular", "corpos livres"] },
+  { termos: ["sinovite", "sinovial"], fragmentos: ["sinovectomia"] },
+  { termos: ["luxacao"], fragmentos: ["luxac"] },
+  { termos: ["fratura"], fragmentos: ["fratura"] },
+  { termos: ["artrose", "osteoartrite", "artrite"], fragmentos: ["artroplastia", "artrite"] },
+  { termos: ["instabilidade"], fragmentos: ["instabilidade", "reconstrucao"] },
+  { termos: ["tendinite", "tendinopatia", "tendao"], fragmentos: ["tendao", "tenoplastia", "tenolise"] },
+  { termos: ["labral", "labrum"], fragmentos: ["labral"] },
+  { termos: ["manguito rotador"], fragmentos: ["manguito rotador"] },
+  { termos: ["hallux valgus", "joanete"], fragmentos: ["hallux valgus"] },
+  { termos: ["hernia de disco"], fragmentos: ["hernia de disco"] },
+];
+
+const TUSS_PALAVRAS_IGNORAR = new Set([
+  "lesao", "lesoes", "tratamento", "cirurgico", "cirurgica", "associada", "associado",
+  "direito", "direita", "esquerdo", "esquerda", "paciente", "procedimento", "apresenta",
+  "apresentando", "completa", "completo", "parcial", "quadro", "historia", "exame",
+]);
+
+function sugerirCodigosTuss(diagnostico, tipoCirurgia) {
+  const diagNorm = tussNormalizar(diagnostico || "");
+  if (!diagNorm) return [];
+
+  const ehArtroscopica = tipoCirurgia === "artroscopica";
+
+  const candidatos = Object.entries(TABELA_TUSS)
+    .map(([codigo, descricao]) => ({ codigo, descricao, descNorm: tussNormalizar(descricao) }))
+    .filter((c) => {
+      const marcadoArtro = c.descNorm.includes("videoartroscopico") || c.descNorm.includes("artroscopia");
+      return ehArtroscopica ? marcadoArtro : !marcadoArtro;
+    });
+
+  const pontuados = candidatos.map((c) => {
+    let pontos = 0;
+    for (const grupo of TUSS_PALAVRAS_CHAVE) {
+      const bateuTermo = grupo.termos.some((t) => diagNorm.includes(t));
+      if (!bateuTermo) continue;
+      const bateuFragmento = grupo.fragmentos.some((f) => c.descNorm.includes(f));
+      if (bateuFragmento) pontos += 3;
+    }
+    // reforço genérico: palavras de 5+ letras do diagnóstico que aparecem na descrição
+    // (ignorando termos médicos genéricos demais, que causariam falso positivo entre regiões)
+    diagNorm.split(/\W+/).forEach((palavra) => {
+      if (palavra.length >= 5 && !TUSS_PALAVRAS_IGNORAR.has(palavra) && c.descNorm.includes(palavra)) pontos += 1;
+    });
+    return { ...c, pontos };
+  });
+
+  return pontuados
+    .filter((c) => c.pontos > 0)
+    .sort((a, b) => b.pontos - a.pontos)
+    .slice(0, 4);
+}

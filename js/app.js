@@ -385,6 +385,49 @@ function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
   container.appendChild(row);
 }
 
+// ---------- Sugestão automática de código por tipo de cirurgia ----------
+function aplicarSugestaoCirurgia(tipo) {
+  document.getElementById("tipo-aberta").classList.toggle("ativo-tipo", tipo === "aberta");
+  document.getElementById("tipo-artro").classList.toggle("ativo-tipo", tipo === "artroscopica");
+
+  const diagnostico = document.getElementById("diagnostico").value.trim();
+  const status = document.getElementById("sugestao-codigos-status");
+
+  if (!diagnostico) {
+    status.style.display = "flex";
+    status.classList.add("erro");
+    status.textContent = "Preencha o diagnóstico na etapa anterior para receber sugestões.";
+    return;
+  }
+
+  const sugestoes = typeof sugerirCodigosTuss === "function" ? sugerirCodigosTuss(diagnostico, tipo) : [];
+
+  const codeList = document.getElementById("code-list");
+  codeList.innerHTML = "";
+
+  if (!sugestoes.length) {
+    status.style.display = "flex";
+    status.classList.remove("erro");
+    status.textContent = "Nenhuma sugestão automática encontrada para este diagnóstico — adicione o código manualmente.";
+    addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+    return;
+  }
+
+  status.style.display = "flex";
+  status.classList.remove("erro");
+  status.textContent = `${sugestoes.length} código(s) sugerido(s) — revise, edite ou remova conforme necessário.`;
+
+  sugestoes.forEach((s) => {
+    addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+    const ultimaLinha = codeList.lastElementChild;
+    ultimaLinha.querySelector(".tuss").value = s.codigo;
+    ultimaLinha.querySelector("input:not(.tuss)").value = s.descricao;
+  });
+}
+
+document.getElementById("tipo-aberta").addEventListener("click", () => aplicarSugestaoCirurgia("aberta"));
+document.getElementById("tipo-artro").addEventListener("click", () => aplicarSugestaoCirurgia("artroscopica"));
+
 document.getElementById("add-code").addEventListener("click", () => {
   addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
 });

@@ -292,6 +292,12 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
   opacity:0;
   cursor:pointer;
 }
+.btn-camera.ativo-tipo{
+  border-color:var(--accent);
+  background:rgba(47,111,237,0.08);
+  color:var(--accent);
+  font-weight:600;
+}
 
 .camera-status{
   margin-top:10px;
