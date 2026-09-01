@@ -179,7 +179,7 @@ comprovar cientificamente a necessidade dele, não questioná-lo ou substituí-l
 
 // Texto final da solicitação: consolida diagnóstico + códigos + evidência de todos os materiais
 // num único texto corrido, e sugere ajuste de código automaticamente (sem o médico precisar pedir).
-async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens }) {
+async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoTexto }) {
   const listaCodigos = codigos.length
     ? codigos.map((c) => `- ${c.codigo || "(sem código)"}: ${c.descricao}`).join("\n")
     : "(nenhum código informado)";
@@ -200,6 +200,7 @@ solicitação cirúrgica completa para envio ao convênio, com foco em reduzir o
 códigos TUSS mais adequados à complexidade real do caso (nunca fraudulentos — apenas mais precisos).
 
 Diagnóstico do paciente: ${diagnostico}
+${laudoTexto ? `Achados do laudo de imagem (RM): ${laudoTexto}` : ""}
 
 Códigos TUSS propostos pelo cirurgião:
 ${listaCodigos}
@@ -216,6 +217,7 @@ Tarefas:
 2. Escreva um texto único e corrido (não uma lista por material), em português, pronto para anexar à
    solicitação do hospital. Esse texto deve:
    - Abrir descrevendo a condição clínica do paciente com base no diagnóstico — a patologia, não o material.
+     ${laudoTexto ? "Correlacione essa descrição com os achados específicos do laudo de imagem informado acima." : ""}
    - Explicar por que o procedimento é necessário para essa condição.
    - Justificar cientificamente cada material solicitado, integrado ao raciocínio clínico do caso
      (não uma lista solta de materiais).
@@ -223,6 +225,9 @@ Tarefas:
      "(periódico, ano — PMID: xxxxx)", usando exclusivamente os estudos listados acima. Essa citação
      nominal é essencial: o texto precisa resistir a questionamento de auditor, então nunca afirme
      "há evidência de nível X" sem apontar exatamente qual estudo sustenta essa afirmação.
+   - Mencionar objetivamente a consequência clínica caso o material seja negado ou substituído
+     (ex.: risco de falha de fixação, necessidade de reintervenção, sequela funcional) — sempre
+     com base no que a literatura citada efetivamente mostra, sem exagero.
    - Se um material não tiver estudo disponível na lista, diga isso com honestidade em vez de inventar
      uma citação — nunca cite um estudo, periódico, ano ou PMID que não esteja listado acima.
    - Ter tom técnico-médico, adequado para leitura por auditor de convênio.
@@ -241,10 +246,17 @@ TEXTO_SOLICITACAO:`;
   }
 
   const match = resposta.match(/CODIGOS_SUGERIDOS:([\s\S]*?)TEXTO_SOLICITACAO:([\s\S]*)/i);
-  if (!match) return { sugestaoCodigos: null, textoPedido: resposta };
+  if (!match) return { sugestaoCodigos: null, textoPedido: resposta + BASE_LEGAL };
 
-  return { sugestaoCodigos: match[1].trim(), textoPedido: match[2].trim() };
+  return { sugestaoCodigos: match[1].trim(), textoPedido: match[2].trim() + BASE_LEGAL };
 }
+
+// Rodapé fixo (não gerado pela IA, para garantir que a citação legal esteja sempre correta).
+const BASE_LEGAL =
+  "\n\nRessalta-se que, nos termos do art. 7º da Resolução Normativa nº 424/2017 da ANS, " +
+  "cabe ao médico assistente — e não à operadora — determinar o tipo, a matéria-prima e as " +
+  "dimensões do material necessário ao procedimento. A Resolução CFM nº 2.318/2022 reforça essa " +
+  "prerrogativa, vedando a substituição da especificação técnica do médico assistente.";
 
 // ---------- Rota principal: gerar parecer ----------
 app.post("/parecer", async (req, res) => {
@@ -296,7 +308,14 @@ app.post("/parecer", async (req, res) => {
 
     const itens = await Promise.all(materiais.map(processarMaterial));
 
-    const textoConsolidado = await gerarSolicitacaoConsolidada({ diagnostico, codigos, itens });
+    let laudoTexto = null;
+    if (paciente) {
+      const registro = await store.getPaciente(paciente);
+      const laudos = registro?.laudos || [];
+      if (laudos.length) laudoTexto = laudos[laudos.length - 1].textoExtraido;
+    }
+
+    const textoConsolidado = await gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoTexto });
 
     if (paciente) {
       await store.salvarPedidoPaciente(paciente, {
