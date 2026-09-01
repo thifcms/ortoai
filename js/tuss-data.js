@@ -264,9 +264,6 @@ const TABELA_TUSS = {
   "30710022": "Retirada de material de síntese - fios, pinos, parafusos ou hastes metálicas intra-ósseas",
   "30710057": "Retirada de fixadores externos",
   "31602118": "Bloqueio de nervo periférico",
-  "31602339": "Bloqueio anestésico de plexos nervosos (lombossacro, braquial, cervical) para tratamento de dor",
-  "31602223": "Passagem de cateter peridural ou subaracnóideo com bloqueio de prova",
-  "31602029": "Analgesia por dia subsequente",
 };
 
 // ---------- Sugestão de códigos por diagnóstico + tipo de cirurgia ----------
@@ -309,10 +306,15 @@ function sugerirCodigosTuss(diagnostico, tipoCirurgia) {
   if (!diagNorm) return [];
 
   if (tipoCirurgia === "bloqueio") {
-    const codigosBloqueio = ["31602118", "31602339", "31602223", "31602029"];
-    return codigosBloqueio
-      .filter((codigo) => TABELA_TUSS[codigo])
-      .map((codigo) => ({ codigo, descricao: TABELA_TUSS[codigo] }));
+    // A TUSS tem só um código genérico para bloqueio de nervo periférico (31602118) — não existe
+    // um código por nervo. Na prática, quando mais de um nervo é bloqueado no mesmo joelho, repete-se
+    // o código especificando o nervo na descrição. Nervos abaixo são os relevantes para cirurgia de
+    // joelho pelo próprio ortopedista (não os usados por anestesiologista em tratamento de dor crônica).
+    return [
+      { codigo: "31602118", descricao: "Bloqueio de nervo periférico (nervo femoral)" },
+      { codigo: "31602118", descricao: "Bloqueio de nervo periférico (nervo obturador)" },
+      { codigo: "31602118", descricao: "Bloqueio de nervo periférico (nervo safeno / canal dos adutores)" },
+    ];
   }
 
   const ehArtroscopica = tipoCirurgia === "artroscopica";
