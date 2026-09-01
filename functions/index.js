@@ -122,6 +122,9 @@ async function chamarGroq({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
       body: JSON.stringify({
         model: imagemBase64 ? GROQ_VISION_MODEL : GROQ_TEXT_MODEL,
         messages: [{ role: "user", content }],
+        // qwen3.6 (visão) desliga o raciocínio de verdade com "none". O gpt-oss (texto) já
+        // retorna o raciocínio num campo separado por padrão, então não precisa de ajuste aqui.
+        ...(imagemBase64 ? { reasoning_effort: "none" } : {}),
       }),
     });
     const data = await resp.json();
