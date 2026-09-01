@@ -331,6 +331,7 @@ app.post("/parecer", async (req, res) => {
         resumo = exemploAutonomo.saida;
         nivelEvidencia = exemploAutonomo.nivelEvidencia || "II";
         estudos = [];
+        await store.registrarUsoCache();
       } else {
         const resultado = await buscarPubmed(m.descricao);
         estudos = resultado.estudos;
@@ -565,6 +566,17 @@ app.post("/pacote", async (req, res) => {
   const { hospital, codigo, descricao } = req.body;
   await store.salvarPacote(hospital, codigo, descricao);
   res.json({ ok: true });
+});
+
+app.get("/estatisticas", async (_req, res) => {
+  const stats = await store.estatisticasAprendizado();
+  // Estimativa aproximada de tokens por chamada de IA evitada (prompt + resposta de síntese) —
+  // é uma estimativa, não uma contagem exata de tokens.
+  const TOKENS_ESTIMADOS_POR_CHAMADA = 1200;
+  res.json({
+    ...stats,
+    tokensEconomizadosEstimados: stats.chamadasEconomizadas * TOKENS_ESTIMADOS_POR_CHAMADA,
+  });
 });
 
 app.get("/health", (_req, res) =>

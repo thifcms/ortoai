@@ -106,6 +106,40 @@ async function getNegativas(convenio, material) {
   return doc.exists ? doc.data().lista || [] : [];
 }
 
+// ---------- Estatísticas de aprendizado / economia de chamadas de IA ----------
+async function registrarUsoCache() {
+  const ref = db().collection("stats").doc("geral");
+  const doc = await ref.get();
+  const atual = doc.exists ? doc.data() : { chamadasEconomizadas: 0 };
+  atual.chamadasEconomizadas = (atual.chamadasEconomizadas || 0) + 1;
+  atual.ultimaAtualizacao = new Date().toISOString();
+  await ref.set(atual);
+}
+
+async function estatisticasAprendizado() {
+  const snap = await db().collection("exemplos").get();
+  let totalRespostasConfirmadas = 0;
+  let materiaisAutonomos = 0;
+
+  snap.forEach((doc) => {
+    const lista = doc.data().lista || [];
+    totalRespostasConfirmadas += lista.length;
+    if (lista.some((e) => (e.confianca || 0) >= 0.9)) materiaisAutonomos += 1;
+  });
+
+  const statsDoc = await db().collection("stats").doc("geral").get();
+  const chamadasEconomizadas = statsDoc.exists ? statsDoc.data().chamadasEconomizadas || 0 : 0;
+  const ultimaAtualizacao = statsDoc.exists ? statsDoc.data().ultimaAtualizacao || null : null;
+
+  return {
+    totalMateriaisComExemplo: snap.size,
+    totalRespostasConfirmadas,
+    materiaisAutonomos,
+    chamadasEconomizadas,
+    ultimaAtualizacao,
+  };
+}
+
 module.exports = {
   getPacote,
   salvarPacote,
@@ -118,4 +152,6 @@ module.exports = {
   excluirPaciente,
   salvarNegativa,
   getNegativas,
+  registrarUsoCache,
+  estatisticasAprendizado,
 };

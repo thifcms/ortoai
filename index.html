@@ -21,6 +21,7 @@
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn-icon" id="open-pacientes" aria-label="Ver pacientes" title="Ver pacientes">👤</button>
+        <button class="btn-icon" id="open-estatisticas" aria-label="Ver estatísticas da IA" title="Ver estatísticas da IA">📊</button>
         <button class="btn-icon" id="open-negativa" aria-label="Registrar negativa recebida" title="Registrar negativa recebida">⚠</button>
       </div>
     </div>
@@ -113,6 +114,14 @@
     </div>
     <div id="result" style="display:none;"></div>
     <button class="btn-ghost" id="back-to-2">Ajustar código / material</button>
+  </section>
+
+  <!-- Tela extra — Estatísticas da IA -->
+  <section class="screen" id="screen-estatisticas">
+    <h2 class="screen-title">Desenvolvimento da IA</h2>
+    <p class="screen-subtitle">Quanto o OrtoAI já aprendeu, e quantas chamadas de IA (Gemini/Groq) isso economizou.</p>
+    <div id="estatisticas-conteudo"><p class="suggestion-text">Carregando...</p></div>
+    <button class="btn-ghost" id="close-estatisticas">Fechar</button>
   </section>
 
   <!-- Tela extra — Pacientes -->

@@ -86,6 +86,57 @@ document.getElementById("close-negativa").addEventListener("click", () => {
 });
 
 // ---------- Tela de pacientes ----------
+// ---------- Tela de estatísticas da IA ----------
+document.getElementById("open-estatisticas").addEventListener("click", async () => {
+  telaAnterior = [...document.querySelectorAll(".screen")].findIndex((s) => s.classList.contains("active")) + 1;
+  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
+  document.getElementById("screen-estatisticas").classList.add("active");
+  mainRail.style.display = "none";
+  document.getElementById("bottom-bar").style.display = "none";
+  await carregarEstatisticas();
+});
+
+document.getElementById("close-estatisticas").addEventListener("click", () => {
+  mainRail.style.display = "flex";
+  goToStep(telaAnterior || 1);
+});
+
+async function carregarEstatisticas() {
+  const container = document.getElementById("estatisticas-conteudo");
+  container.innerHTML = `<p class="suggestion-text">Carregando...</p>`;
+
+  try {
+    const resp = await fetch(`${API_BASE}/estatisticas`);
+    const s = await resp.json();
+
+    const ultimaData = s.ultimaAtualizacao ? new Date(s.ultimaAtualizacao).toLocaleString("pt-BR") : "ainda não houve economia registrada";
+
+    container.innerHTML = `
+      <div class="card">
+        <div class="meta">Chamadas de IA economizadas</div>
+        <h3>${s.chamadasEconomizadas || 0}</h3>
+        <p class="suggestion-text">Vezes que o OrtoAI usou uma resposta já aprendida em vez de chamar o Gemini/Groq de novo.</p>
+      </div>
+      <div class="card">
+        <div class="meta">Estimativa de tokens economizados</div>
+        <h3>${(s.tokensEconomizadosEstimados || 0).toLocaleString("pt-BR")}</h3>
+        <p class="suggestion-text">Estimativa aproximada — não é uma contagem exata de tokens.</p>
+      </div>
+      <div class="card">
+        <div class="meta">Materiais já aprendidos</div>
+        <h3>${s.totalMateriaisComExemplo || 0}</h3>
+        <p class="suggestion-text">${s.materiaisAutonomos || 0} já respondem automaticamente (confiança ≥ 90%), com base em ${s.totalRespostasConfirmadas || 0} confirmações registradas.</p>
+      </div>
+      <div class="card">
+        <div class="meta">Última economia registrada</div>
+        <p class="suggestion-text">${ultimaData}</p>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<p class="suggestion-text">Não foi possível carregar as estatísticas (${err.message}).</p>`;
+  }
+}
+
 document.getElementById("open-pacientes").addEventListener("click", async () => {
   telaAnterior = [...document.querySelectorAll(".screen")].findIndex((s) => s.classList.contains("active")) + 1;
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
@@ -563,8 +614,40 @@ function renderParecer(parecer) {
       <h3>${item.material}</h3>
       ${evidenceLadder(item.nivelEvidencia)}
       <p class="suggestion-text">${item.resumo}</p>
+      ${
+        parecer.demo
+          ? ""
+          : `<button class="btn-ghost btn-confirmar" style="margin-top:10px;" data-material="${encodeURIComponent(item.material)}" data-resumo="${encodeURIComponent(item.resumo)}" data-nivel="${item.nivelEvidencia}">✓ Confirmar este parecer</button>`
+      }
     `;
     container.appendChild(card);
+  });
+
+  container.querySelectorAll(".btn-confirmar").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const material = decodeURIComponent(btn.dataset.material);
+      const resumo = decodeURIComponent(btn.dataset.resumo);
+      const nivel = btn.dataset.nivel;
+      btn.disabled = true;
+      btn.textContent = "Enviando...";
+      try {
+        await fetch(`${API_BASE}/confirmar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            material,
+            entrada: state.diagnostico,
+            saida: resumo,
+            nivelEvidencia: nivel,
+            correto: true,
+          }),
+        });
+        btn.textContent = "✓ Confirmado — obrigado!";
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = "✓ Confirmar este parecer";
+      }
+    });
   });
 
   const textCard = document.createElement("div");
