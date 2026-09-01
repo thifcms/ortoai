@@ -101,8 +101,8 @@ async function buscarPubmed(termo) {
 
 // ---------- Gemini ----------
 // Groq como fallback gratuito quando o Gemini estiver sobrecarregado ou sem cota (mesmo padrão já usado na Audit AI).
-const GROQ_TEXT_MODEL = "llama-3.3-70b-versatile";
-const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+const GROQ_TEXT_MODEL = "openai/gpt-oss-120b";
+const GROQ_VISION_MODEL = "qwen/qwen3.6-27b";
 
 async function chamarGroq({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   const apiKey = process.env.GROQ_API_KEY;
