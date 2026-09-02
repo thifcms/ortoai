@@ -295,7 +295,7 @@ document.getElementById("usar-procedimento").addEventListener("click", async () 
       picker.innerHTML = `<p class="suggestion-text">Nenhum procedimento cadastrado ainda.</p>`;
       return;
     }
-    picker.innerHTML = "";
+    picker.innerHTML = `<p class="suggestion-text" style="margin-bottom:8px;">Toque num procedimento abaixo para carregar os códigos e materiais dele:</p>`;
     procedimentos.forEach((p) => {
       const btn = document.createElement("button");
       btn.type = "button";
