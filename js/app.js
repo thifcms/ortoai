@@ -752,7 +752,12 @@ document.getElementById("to-step-3").addEventListener("click", async () => {
   state.codigos = collectRows("code-list", true);
   state.materiais = collectRows("material-list", false);
 
-  goToStep(3);
+  if (!state.materiais.length) {
+    alert("Adicione ao menos um material antes de gerar o parecer.");
+    return;
+  }
+
+  navegarPara("3");
   document.getElementById("loading").style.display = "block";
   document.getElementById("result").style.display = "none";
 
@@ -778,9 +783,15 @@ async function gerarParecer(payload) {
 }
 
 function demoParecer(payload, motivoErro) {
-  const motivo = motivoErro
-    ? `Não foi possível falar com o servidor (${motivoErro}). Isso costuma ser tempo limite excedido — tente de novo com menos materiais de uma vez, ou aguarde um pouco.`
-    : "Backend ainda não conectado.";
+  let motivo = "Backend ainda não conectado.";
+  if (motivoErro) {
+    const codigoHttp = parseInt((motivoErro.match(/HTTP (\d+)/) || [])[1], 10);
+    if (codigoHttp >= 400 && codigoHttp < 500) {
+      motivo = `O servidor recusou o pedido (${motivoErro}) — confira se diagnóstico e material estão preenchidos corretamente.`;
+    } else {
+      motivo = `Não foi possível falar com o servidor (${motivoErro}). Isso costuma ser tempo limite excedido — tente de novo com menos materiais de uma vez, ou aguarde um pouco.`;
+    }
+  }
   return {
     demo: true,
     itens: payload.materiais.length
