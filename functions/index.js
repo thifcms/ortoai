@@ -242,7 +242,7 @@ async function chamarIA({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   return { texto: null, detalhe: resultadoGroq.detalhe, provedor: null };
 }
 
-async function sintetizarComGemini({ diagnostico, material, estudos, exemplos, negativas }) {
+async function sintetizarComGemini({ diagnostico, material, estudos, exemplos, negativas, contextoBloqueio }) {
   const contextoAprendizado = exemplos.length
     ? `Exemplos de pareceres já validados por este médico, siga o mesmo estilo e rigor:\n${exemplos
         .map((e) => `- ${e.entrada} => ${e.saida}`)
@@ -256,9 +256,15 @@ de forma que antecipe e neutralize esses argumentos, sem citá-los literalmente:
         .join("\n")}`
     : "";
 
+  const avisoContexto =
+    contextoBloqueio === "dor"
+      ? `\nATENÇÃO: este é um pedido de MANEJO DE DOR CRÔNICA, sem cirurgia associada. NUNCA use
+"perioperatório(a)", "pós-operatório(a)" ou linguagem de cirurgia — isso seria factualmente errado.\n`
+      : "";
+
   const prompt = `Você é um especialista em cirurgia de joelho auxiliando um cirurgião a justificar
 material cirúrgico perante auditoria de convênio.
-
+${avisoContexto}
 Diagnóstico: ${diagnostico}
 Material solicitado: ${material}
 Estudos científicos encontrados (PubMed, alto nível de evidência):
@@ -286,7 +292,7 @@ comprovar cientificamente a necessidade dele, não questioná-lo ou substituí-l
 
 // Texto final da solicitação: consolida diagnóstico + códigos + evidência de todos os materiais
 // num único texto corrido, e sugere ajuste de código automaticamente (sem o médico precisar pedir).
-async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoTexto }) {
+async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoTexto, contextoBloqueio }) {
   const listaCodigos = codigos.length
     ? codigos.map((c) => `- ${c.codigo || "(sem código)"}: ${c.descricao}`).join("\n")
     : "(nenhum código informado)";
@@ -302,10 +308,19 @@ async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoT
     })
     .join("\n");
 
+  const avisoContexto =
+    contextoBloqueio === "dor"
+      ? `\nATENÇÃO — CONTEXTO CRÍTICO: este pedido é de MANEJO DE DOR CRÔNICA, sem nenhuma cirurgia
+associada agora. NUNCA use os termos "perioperatório(a)", "pós-operatório(a)", "intraoperatório(a)"
+ou qualquer linguagem que sugira que há uma cirurgia acontecendo — isso seria factualmente errado e
+enfraqueceria o pedido perante o auditor. Descreva como tratamento intervencionista/ambulatorial da
+dor (ex.: "alívio da dor crônica", "tratamento conservador da dor", "melhora funcional").\n`
+      : "";
+
   const prompt = `Você é um especialista em cirurgia de joelho auxiliando um cirurgião a montar uma
 solicitação cirúrgica completa para envio ao convênio, com foco em reduzir o risco de glosa e usar os
 códigos TUSS mais adequados à complexidade real do caso (nunca fraudulentos — apenas mais precisos).
-
+${avisoContexto}
 Diagnóstico do paciente: ${diagnostico}
 ${laudoTexto ? `Achados do laudo de imagem (RM): ${laudoTexto}` : ""}
 
@@ -370,7 +385,7 @@ passar de 8 linhas — se estiver maior, resuma antes de responder.`;
 // ---------- Rota principal: gerar parecer ----------
 app.post("/parecer", async (req, res) => {
   try {
-    const { paciente, diagnostico, hospital, convenio, codigos = [], materiais = [] } = req.body;
+    const { paciente, diagnostico, hospital, convenio, codigos = [], materiais = [], contextoBloqueio } = req.body;
     if (!diagnostico || !materiais.length) {
       return res.status(400).json({ erro: "Informe diagnóstico e ao menos um material." });
     }
@@ -402,7 +417,7 @@ app.post("/parecer", async (req, res) => {
         const resultado = await buscarPubmed(termoBusca);
         estudos = resultado.estudos;
         nivelEvidencia = resultado.nivelEvidencia;
-        resumo = await sintetizarComGemini({ diagnostico, material: m.descricao, estudos, exemplos, negativas });
+        resumo = await sintetizarComGemini({ diagnostico, material: m.descricao, estudos, exemplos, negativas, contextoBloqueio });
       }
 
       return {
@@ -426,7 +441,7 @@ app.post("/parecer", async (req, res) => {
       if (laudos.length) laudoTexto = laudos[laudos.length - 1].textoExtraido;
     }
 
-    const textoConsolidado = await gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoTexto });
+    const textoConsolidado = await gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoTexto, contextoBloqueio });
 
     if (paciente) {
       await store.salvarPedidoPaciente(paciente, {

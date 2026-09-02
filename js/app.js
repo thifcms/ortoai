@@ -738,11 +738,13 @@ document.getElementById("tipo-bloqueio").addEventListener("click", () => {
 document.getElementById("bloqueio-ctx-dor").addEventListener("click", () => {
   document.getElementById("bloqueio-ctx-dor").classList.add("ativo-tipo");
   document.getElementById("bloqueio-ctx-cirurgia").classList.remove("ativo-tipo");
+  state.contextoBloqueio = "dor";
   aplicarSugestaoCirurgia("bloqueio", "dor");
 });
 document.getElementById("bloqueio-ctx-cirurgia").addEventListener("click", () => {
   document.getElementById("bloqueio-ctx-cirurgia").classList.add("ativo-tipo");
   document.getElementById("bloqueio-ctx-dor").classList.remove("ativo-tipo");
+  state.contextoBloqueio = "cirurgia";
   aplicarSugestaoCirurgia("bloqueio", "cirurgia");
 });
 
