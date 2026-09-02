@@ -188,25 +188,36 @@ async function chamarGroq({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
       ]
     : prompt;
 
-  try {
-    const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: imagemBase64 ? GROQ_VISION_MODEL : GROQ_TEXT_MODEL,
-        messages: [{ role: "user", content }],
-        // qwen3.6 (visão) desliga o raciocínio de verdade com "none". O gpt-oss (texto) já
-        // retorna o raciocínio num campo separado por padrão, então não precisa de ajuste aqui.
-        ...(imagemBase64 ? { reasoning_effort: "none" } : {}),
-      }),
-    });
-    const data = await resp.json();
-    const texto = data?.choices?.[0]?.message?.content?.trim();
-    if (texto) return { texto, detalhe: null };
-    return { texto: null, detalhe: `Groq HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}` };
-  } catch (err) {
-    return { texto: null, detalhe: `Erro de rede no Groq: ${err.message}` };
+  const tentativas = [0, 1000, 2500]; // sem espera, depois 1s, depois 2.5s
+  let ultimoErro = null;
+
+  for (const espera of tentativas) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    try {
+      const resp = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: imagemBase64 ? GROQ_VISION_MODEL : GROQ_TEXT_MODEL,
+          messages: [{ role: "user", content }],
+          // qwen3.6 (visão) desliga o raciocínio de verdade com "none". O gpt-oss (texto) já
+          // retorna o raciocínio num campo separado por padrão, então não precisa de ajuste aqui.
+          ...(imagemBase64 ? { reasoning_effort: "none" } : {}),
+        }),
+      });
+      const data = await resp.json();
+      const texto = data?.choices?.[0]?.message?.content?.trim();
+      if (texto) return { texto, detalhe: null };
+
+      ultimoErro = `Groq HTTP ${resp.status} — ${JSON.stringify(data).slice(0, 300)}`;
+      if (resp.status !== 503 && resp.status !== 429) break; // só insiste em sobrecarga/limite
+      console.warn(`Groq sobrecarregado (${resp.status}), tentando de novo...`);
+    } catch (err) {
+      ultimoErro = `Erro de rede no Groq: ${err.message}`;
+    }
   }
+
+  return { texto: null, detalhe: ultimoErro };
 }
 
 // Tenta o Gemini primeiro (com retry em sobrecarga/limite); se esgotar as tentativas ou faltar
