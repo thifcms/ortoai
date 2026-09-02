@@ -39,18 +39,46 @@ const state = {
   materiais: [],
 };
 
-// ---------- Navegação entre etapas ----------
-function goToStep(n) {
+// ---------- Navegação (com histórico do navegador — o botão/gesto voltar do celular
+// deve trocar de tela dentro do app, nunca sair dele) ----------
+const mainRail = document.getElementById("main-rail");
+const TELAS_NUMERADAS = ["1", "2", "3"];
+
+function mostrarTela(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  document.getElementById(`screen-${n}`).classList.add("active");
+  document.getElementById(`screen-${id}`).classList.add("active");
 
-  document.querySelectorAll(".rail-step").forEach((r) => {
-    const step = Number(r.dataset.step);
-    r.classList.toggle("active", step === n);
-    r.classList.toggle("done", step < n);
-  });
+  const ehNumerada = TELAS_NUMERADAS.includes(String(id));
+  mainRail.style.display = ehNumerada ? "flex" : "none";
+  document.getElementById("bottom-bar").style.display = id === "3" ? "flex" : "none";
 
-  document.getElementById("bottom-bar").style.display = n === 3 ? "flex" : "none";
+  if (ehNumerada) {
+    document.querySelectorAll(".rail-step").forEach((r) => {
+      const step = Number(r.dataset.step);
+      r.classList.toggle("active", step === Number(id));
+      r.classList.toggle("done", step < Number(id));
+    });
+  }
+}
+
+function navegarPara(id) {
+  mostrarTela(id);
+  history.pushState({ tela: String(id) }, "", location.href);
+}
+
+function voltar() {
+  history.back();
+}
+
+window.addEventListener("popstate", (e) => {
+  mostrarTela(e.state && e.state.tela ? e.state.tela : "1");
+});
+
+history.replaceState({ tela: "1" }, "", location.href);
+
+// Mantido por compatibilidade com o restante do código
+function goToStep(n) {
+  navegarPara(String(n));
 }
 
 document.getElementById("to-step-2").addEventListener("click", () => {
@@ -62,44 +90,20 @@ document.getElementById("to-step-2").addEventListener("click", () => {
     document.getElementById("diagnostico").focus();
     return;
   }
-  goToStep(2);
+  navegarPara("2");
 });
 
-document.getElementById("back-to-1").addEventListener("click", () => goToStep(1));
-document.getElementById("back-to-2").addEventListener("click", () => goToStep(2));
+document.getElementById("back-to-1").addEventListener("click", voltar);
+document.getElementById("back-to-2").addEventListener("click", voltar);
 
-// ---------- Tela de registrar negativa (fora do fluxo numerado) ----------
-const mainRail = document.getElementById("main-rail");
-let telaAnterior = 1;
+document.getElementById("open-negativa").addEventListener("click", () => navegarPara("negativa"));
+document.getElementById("close-negativa").addEventListener("click", voltar);
 
-document.getElementById("open-negativa").addEventListener("click", () => {
-  telaAnterior = [...document.querySelectorAll(".screen")].findIndex((s) => s.classList.contains("active")) + 1;
-  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  document.getElementById("screen-negativa").classList.add("active");
-  mainRail.style.display = "none";
-  document.getElementById("bottom-bar").style.display = "none";
-});
-
-document.getElementById("close-negativa").addEventListener("click", () => {
-  mainRail.style.display = "flex";
-  goToStep(telaAnterior || 1);
-});
-
-// ---------- Tela de pacientes ----------
-// ---------- Tela de estatísticas da IA ----------
 document.getElementById("open-estatisticas").addEventListener("click", async () => {
-  telaAnterior = [...document.querySelectorAll(".screen")].findIndex((s) => s.classList.contains("active")) + 1;
-  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  document.getElementById("screen-estatisticas").classList.add("active");
-  mainRail.style.display = "none";
-  document.getElementById("bottom-bar").style.display = "none";
+  navegarPara("estatisticas");
   await carregarEstatisticas();
 });
-
-document.getElementById("close-estatisticas").addEventListener("click", () => {
-  mainRail.style.display = "flex";
-  goToStep(telaAnterior || 1);
-});
+document.getElementById("close-estatisticas").addEventListener("click", voltar);
 
 async function carregarEstatisticas() {
   const container = document.getElementById("estatisticas-conteudo");
@@ -137,19 +141,174 @@ async function carregarEstatisticas() {
   }
 }
 
+// ---------- Tela de Configurações (materiais e procedimentos cadastrados) ----------
+document.getElementById("open-config").addEventListener("click", async () => {
+  navegarPara("config");
+  await Promise.all([carregarMateriaisCadastrados(), carregarProcedimentosCadastrados()]);
+});
+document.getElementById("close-config").addEventListener("click", voltar);
+
+async function atualizarDatalistMateriais() {
+  try {
+    const resp = await fetch(`${API_BASE}/materiais`);
+    const materiais = await resp.json();
+    const datalist = document.getElementById("materiais-datalist");
+    if (datalist) datalist.innerHTML = materiais.map((m) => `<option value="${m}"></option>`).join("");
+  } catch (err) {
+    // sem problema — o campo continua funcionando normalmente, só sem sugestão automática
+  }
+}
+atualizarDatalistMateriais();
+
+async function carregarMateriaisCadastrados() {
+  const lista = document.getElementById("materiais-cadastrados-lista");
+  lista.innerHTML = `<p class="suggestion-text">Carregando...</p>`;
+  try {
+    const resp = await fetch(`${API_BASE}/materiais`);
+    const materiais = await resp.json();
+    if (!materiais.length) {
+      lista.innerHTML = `<p class="suggestion-text">Nenhum material cadastrado ainda.</p>`;
+      return;
+    }
+    lista.innerHTML = "";
+    materiais.forEach((nome) => {
+      const row = document.createElement("div");
+      row.className = "code-row";
+      row.innerHTML = `<input type="text" value="${nome}" disabled style="flex:1;" />`;
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "btn-remove";
+      removeBtn.textContent = "✕";
+      removeBtn.addEventListener("click", async () => {
+        await fetch(`${API_BASE}/materiais/${encodeURIComponent(nome)}`, { method: "DELETE" });
+        carregarMateriaisCadastrados();
+        atualizarDatalistMateriais();
+      });
+      row.appendChild(removeBtn);
+      lista.appendChild(row);
+    });
+  } catch (err) {
+    lista.innerHTML = `<p class="suggestion-text">Não foi possível carregar (${err.message}).</p>`;
+  }
+}
+
+document.getElementById("add-material-cadastrado").addEventListener("click", async () => {
+  const input = document.getElementById("novo-material-input");
+  const nome = input.value.trim();
+  if (!nome) return;
+  await fetch(`${API_BASE}/materiais`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nome }),
+  });
+  input.value = "";
+  carregarMateriaisCadastrados();
+  atualizarDatalistMateriais();
+});
+
+async function carregarProcedimentosCadastrados() {
+  const lista = document.getElementById("procedimentos-cadastrados-lista");
+  lista.innerHTML = `<p class="suggestion-text">Carregando...</p>`;
+  try {
+    const resp = await fetch(`${API_BASE}/procedimentos`);
+    const procedimentos = await resp.json();
+    if (!procedimentos.length) {
+      lista.innerHTML = `<p class="suggestion-text">Nenhum procedimento cadastrado ainda.</p>`;
+      return;
+    }
+    lista.innerHTML = "";
+    procedimentos.forEach((p) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h3>${p.nome}</h3><p class="suggestion-text">${p.codigos.length} código(s), ${p.materiais.length} material(is)</p>`;
+      const excluirBtn = document.createElement("button");
+      excluirBtn.type = "button";
+      excluirBtn.className = "btn-ghost";
+      excluirBtn.style.color = "var(--risk)";
+      excluirBtn.textContent = "🗑️ Excluir";
+      excluirBtn.addEventListener("click", async () => {
+        await fetch(`${API_BASE}/procedimentos/${encodeURIComponent(p.nome)}`, { method: "DELETE" });
+        carregarProcedimentosCadastrados();
+      });
+      card.appendChild(excluirBtn);
+      lista.appendChild(card);
+    });
+  } catch (err) {
+    lista.innerHTML = `<p class="suggestion-text">Não foi possível carregar (${err.message}).</p>`;
+  }
+}
+
+// ---------- Usar / salvar procedimento (na etapa Código & material) ----------
+document.getElementById("usar-procedimento").addEventListener("click", async () => {
+  const picker = document.getElementById("procedimento-picker");
+  if (picker.style.display === "block") {
+    picker.style.display = "none";
+    return;
+  }
+  picker.style.display = "block";
+  picker.innerHTML = `<p class="suggestion-text">Carregando...</p>`;
+  try {
+    const resp = await fetch(`${API_BASE}/procedimentos`);
+    const procedimentos = await resp.json();
+    if (!procedimentos.length) {
+      picker.innerHTML = `<p class="suggestion-text">Nenhum procedimento cadastrado ainda.</p>`;
+      return;
+    }
+    picker.innerHTML = "";
+    procedimentos.forEach((p) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn-add";
+      btn.style.marginBottom = "6px";
+      btn.textContent = `${p.nome} (${p.codigos.length} cód., ${p.materiais.length} mat.)`;
+      btn.addEventListener("click", () => {
+        (p.codigos || []).forEach((c) => {
+          addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+          const linha = document.getElementById("code-list").lastElementChild;
+          linha.querySelector(".tuss").value = c.codigo;
+          linha.querySelector("input:not(.tuss)").value = c.descricao;
+        });
+        (p.materiais || []).forEach((m) => {
+          addRow("material-list", { placeholderMain: "Ex: Âncora de sutura 5.5mm titânio", withCode: false });
+          const linha = document.getElementById("material-list").lastElementChild;
+          linha.querySelector("input").value = m.descricao;
+        });
+        picker.style.display = "none";
+      });
+      picker.appendChild(btn);
+    });
+  } catch (err) {
+    picker.innerHTML = `<p class="suggestion-text">Não foi possível carregar (${err.message}).</p>`;
+  }
+});
+
+document.getElementById("salvar-procedimento").addEventListener("click", async () => {
+  const nome = prompt("Nome deste procedimento (ex: Reconstrução de LCA padrão):");
+  if (!nome) return;
+  const codigos = collectRows("code-list", true);
+  const materiais = collectRows("material-list", false);
+  if (!codigos.length && !materiais.length) {
+    alert("Adicione ao menos um código ou material antes de salvar.");
+    return;
+  }
+  try {
+    await fetch(`${API_BASE}/procedimentos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome, codigos, materiais }),
+    });
+    alert("Procedimento salvo!");
+  } catch (err) {
+    alert(`Não foi possível salvar (${err.message}).`);
+  }
+});
+
 document.getElementById("open-pacientes").addEventListener("click", async () => {
-  telaAnterior = [...document.querySelectorAll(".screen")].findIndex((s) => s.classList.contains("active")) + 1;
-  document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
-  document.getElementById("screen-pacientes").classList.add("active");
-  mainRail.style.display = "none";
-  document.getElementById("bottom-bar").style.display = "none";
+  navegarPara("pacientes");
   await carregarPacientes();
 });
 
-document.getElementById("close-pacientes").addEventListener("click", () => {
-  mainRail.style.display = "flex";
-  goToStep(telaAnterior || 1);
-});
+document.getElementById("close-pacientes").addEventListener("click", voltar);
 
 let todosPacientes = [];
 
@@ -414,6 +573,7 @@ function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
   const mainInput = document.createElement("input");
   mainInput.type = "text";
   mainInput.placeholder = placeholderMain;
+  if (!withCode) mainInput.setAttribute("list", "materiais-datalist");
   row.appendChild(mainInput);
 
   if (withCode && typeof TABELA_TUSS !== "undefined") {
@@ -444,6 +604,9 @@ async function aplicarSugestaoCirurgia(tipo) {
 
   const diagnostico = document.getElementById("diagnostico").value.trim();
   const status = document.getElementById("sugestao-codigos-status");
+  const picker = document.getElementById("sugestao-codigos-picker");
+  picker.style.display = "none";
+  picker.innerHTML = "";
 
   if (!diagnostico) {
     status.style.display = "flex";
@@ -452,12 +615,12 @@ async function aplicarSugestaoCirurgia(tipo) {
     return;
   }
 
-  let sugestoes = [];
+  status.style.display = "flex";
+  status.classList.remove("erro");
+  status.textContent = tipo === "bloqueio" ? "Analisando diagnóstico para escolher os nervos mais adequados..." : "Buscando sugestões...";
 
+  let sugestoes = [];
   if (tipo === "bloqueio") {
-    status.style.display = "flex";
-    status.classList.remove("erro");
-    status.textContent = "Analisando diagnóstico para escolher os nervos mais adequados...";
     try {
       const resp = await fetch(`${API_BASE}/sugerir-bloqueio`, {
         method: "POST",
@@ -473,27 +636,48 @@ async function aplicarSugestaoCirurgia(tipo) {
     sugestoes = typeof sugerirCodigosTuss === "function" ? sugerirCodigosTuss(diagnostico, tipo) : [];
   }
 
-  const codeList = document.getElementById("code-list");
-  codeList.innerHTML = "";
-
   if (!sugestoes.length) {
-    status.style.display = "flex";
-    status.classList.remove("erro");
     status.textContent = "Nenhuma sugestão automática encontrada para este diagnóstico — adicione o código manualmente.";
-    addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
     return;
   }
 
-  status.style.display = "flex";
-  status.classList.remove("erro");
-  status.textContent = `${sugestoes.length} código(s) sugerido(s) — revise, edite ou remova conforme necessário.`;
+  status.textContent = `${sugestoes.length} sugestão(ões) encontrada(s) — marque as que quiser adicionar:`;
 
+  picker.style.display = "block";
   sugestoes.forEach((s) => {
-    addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
-    const ultimaLinha = codeList.lastElementChild;
-    ultimaLinha.querySelector(".tuss").value = s.codigo;
-    ultimaLinha.querySelector("input:not(.tuss)").value = s.descricao;
+    const label = document.createElement("label");
+    label.style.cssText = "display:flex; align-items:flex-start; gap:10px; padding:8px 0; font-size:0.88rem; border-bottom:1px solid var(--border);";
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.checked = true;
+    check.style.marginTop = "3px";
+    check.dataset.codigo = s.codigo;
+    check.dataset.descricao = s.descricao;
+    const texto = document.createElement("span");
+    texto.innerHTML = `${s.descricao}<span class="meta" style="display:block; margin-top:2px;">${s.codigo}</span>`;
+    label.appendChild(check);
+    label.appendChild(texto);
+    picker.appendChild(label);
   });
+
+  const btnAdicionar = document.createElement("button");
+  btnAdicionar.type = "button";
+  btnAdicionar.className = "btn-primary";
+  btnAdicionar.style.marginTop = "12px";
+  btnAdicionar.textContent = "Adicionar selecionados";
+  btnAdicionar.addEventListener("click", () => {
+    let adicionados = 0;
+    picker.querySelectorAll('input[type="checkbox"]:checked').forEach((chk) => {
+      addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+      const linha = document.getElementById("code-list").lastElementChild;
+      linha.querySelector(".tuss").value = chk.dataset.codigo;
+      linha.querySelector("input:not(.tuss)").value = chk.dataset.descricao;
+      adicionados++;
+    });
+    picker.style.display = "none";
+    status.textContent = `${adicionados} código(s) adicionado(s) — revise, edite ou remova conforme necessário.`;
+  });
+  picker.appendChild(btnAdicionar);
 }
 
 document.getElementById("tipo-aberta").addEventListener("click", () => aplicarSugestaoCirurgia("aberta"));

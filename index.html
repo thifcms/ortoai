@@ -21,6 +21,7 @@
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn-icon" id="open-pacientes" aria-label="Ver pacientes" title="Ver pacientes">👤</button>
+        <button class="btn-icon" id="open-config" aria-label="Configurações" title="Configurações">⚙️</button>
         <button class="btn-icon" id="open-estatisticas" aria-label="Ver estatísticas da IA" title="Ver estatísticas da IA">📊</button>
         <button class="btn-icon" id="open-negativa" aria-label="Registrar negativa recebida" title="Registrar negativa recebida">⚠</button>
       </div>
@@ -82,6 +83,14 @@
       </div>
       <button type="button" class="btn-camera" id="tipo-bloqueio" style="margin-top:8px;">Bloqueio de Nervo Periférico</button>
       <div id="sugestao-codigos-status" class="camera-status" style="display:none;"></div>
+      <div id="sugestao-codigos-picker" class="card" style="display:none; margin-top:10px;"></div>
+    </div>
+    <div class="field-group">
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="btn-ghost" id="usar-procedimento" style="flex:1; margin-top:0;">📋 Usar procedimento salvo</button>
+        <button type="button" class="btn-ghost" id="salvar-procedimento" style="flex:1; margin-top:0;">💾 Salvar como procedimento</button>
+      </div>
+      <div id="procedimento-picker" style="display:none; margin-top:10px;"></div>
     </div>
     <div class="field-group">
       <label>Códigos TUSS propostos</label>
@@ -90,6 +99,7 @@
     </div>
     <div class="field-group">
       <label>Materiais solicitados</label>
+      <datalist id="materiais-datalist"></datalist>
       <div id="material-list"></div>
       <button class="btn-add" id="add-material">+ adicionar material</button>
     </div>
@@ -114,6 +124,29 @@
     </div>
     <div id="result" style="display:none;"></div>
     <button class="btn-ghost" id="back-to-2">Ajustar código / material</button>
+  </section>
+
+  <!-- Tela extra — Configurações -->
+  <section class="screen" id="screen-config">
+    <h2 class="screen-title">Configurações</h2>
+    <p class="screen-subtitle">Materiais e procedimentos cadastrados para reaproveitar em pedidos futuros.</p>
+
+    <div class="field-group">
+      <label>Materiais cadastrados</label>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="novo-material-input" placeholder="Nome do material" style="flex:1;" />
+        <button class="btn-primary" id="add-material-cadastrado" style="width:auto; padding:0 18px; margin-top:0;">+</button>
+      </div>
+      <div id="materiais-cadastrados-lista" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="field-group">
+      <label>Procedimentos cadastrados</label>
+      <p class="suggestion-text" style="margin-bottom:10px;">Salve um combo de códigos + materiais na etapa "Código & material" do pedido.</p>
+      <div id="procedimentos-cadastrados-lista"></div>
+    </div>
+
+    <button class="btn-ghost" id="close-config">Fechar</button>
   </section>
 
   <!-- Tela extra — Estatísticas da IA -->

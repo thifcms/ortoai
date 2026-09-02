@@ -140,6 +140,46 @@ async function estatisticasAprendizado() {
   };
 }
 
+// ---------- Materiais cadastrados (lista reaproveitável em pedidos futuros) ----------
+async function listarMateriaisCadastrados() {
+  const snap = await db().collection("materiaisCadastrados").orderBy("nome").get();
+  return snap.docs.map((d) => d.data().nome);
+}
+
+async function salvarMaterialCadastrado(nome) {
+  if (!nome) return;
+  await db().collection("materiaisCadastrados").doc(slug(nome)).set({ nome, criadoEm: new Date().toISOString() });
+}
+
+async function excluirMaterialCadastrado(nome) {
+  if (!nome) return;
+  await db().collection("materiaisCadastrados").doc(slug(nome)).delete();
+}
+
+// ---------- Procedimentos cadastrados (combo salvo de códigos + materiais) ----------
+async function listarProcedimentos() {
+  const snap = await db().collection("procedimentos").orderBy("nome").get();
+  return snap.docs.map((d) => d.data());
+}
+
+async function salvarProcedimento({ nome, codigos, materiais }) {
+  if (!nome) return;
+  await db()
+    .collection("procedimentos")
+    .doc(slug(nome))
+    .set({ nome, codigos: codigos || [], materiais: materiais || [], criadoEm: new Date().toISOString() });
+}
+
+async function getProcedimento(nome) {
+  const doc = await db().collection("procedimentos").doc(slug(nome)).get();
+  return doc.exists ? doc.data() : null;
+}
+
+async function excluirProcedimento(nome) {
+  if (!nome) return;
+  await db().collection("procedimentos").doc(slug(nome)).delete();
+}
+
 module.exports = {
   getPacote,
   salvarPacote,
@@ -154,4 +194,11 @@ module.exports = {
   getNegativas,
   registrarUsoCache,
   estatisticasAprendizado,
+  listarMateriaisCadastrados,
+  salvarMaterialCadastrado,
+  excluirMaterialCadastrado,
+  listarProcedimentos,
+  salvarProcedimento,
+  getProcedimento,
+  excluirProcedimento,
 };

@@ -571,6 +571,46 @@ app.post("/pacote", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- Materiais cadastrados ----------
+app.get("/materiais", async (_req, res) => {
+  res.json(await store.listarMateriaisCadastrados());
+});
+
+app.post("/materiais", async (req, res) => {
+  const { nome } = req.body;
+  if (!nome) return res.status(400).json({ erro: "Informe o nome do material." });
+  await store.salvarMaterialCadastrado(nome);
+  res.json({ ok: true });
+});
+
+app.delete("/materiais/:nome", async (req, res) => {
+  await store.excluirMaterialCadastrado(req.params.nome);
+  res.json({ ok: true });
+});
+
+// ---------- Procedimentos cadastrados ----------
+app.get("/procedimentos", async (_req, res) => {
+  res.json(await store.listarProcedimentos());
+});
+
+app.post("/procedimentos", async (req, res) => {
+  const { nome, codigos, materiais } = req.body;
+  if (!nome) return res.status(400).json({ erro: "Informe o nome do procedimento." });
+  await store.salvarProcedimento({ nome, codigos, materiais });
+  res.json({ ok: true });
+});
+
+app.get("/procedimentos/:nome", async (req, res) => {
+  const p = await store.getProcedimento(req.params.nome);
+  if (!p) return res.status(404).json({ erro: "Procedimento não encontrado." });
+  res.json(p);
+});
+
+app.delete("/procedimentos/:nome", async (req, res) => {
+  await store.excluirProcedimento(req.params.nome);
+  res.json({ ok: true });
+});
+
 app.get("/estatisticas", async (_req, res) => {
   const stats = await store.estatisticasAprendizado();
   // Estimativa aproximada de tokens por chamada de IA evitada (prompt + resposta de síntese) —
