@@ -131,8 +131,16 @@ async function buscarPubmed(termo) {
   const pmidsJaIncluidos = new Set(estudosBase.map((e) => String(e.pmid)));
   const estudosComplementares = estudosEuropePmc.filter((e) => !pmidsJaIncluidos.has(String(e.pmid)));
 
+  // Prioriza estudos da Cochrane (padrão-ouro de evidência) no topo, sem nenhuma busca extra —
+  // só reordena o que já foi encontrado.
+  const todosEstudos = [...estudosBase, ...estudosComplementares].sort((a, b) => {
+    const aCochrane = (a.fonte || "").toLowerCase().includes("cochrane") ? 0 : 1;
+    const bCochrane = (b.fonte || "").toLowerCase().includes("cochrane") ? 0 : 1;
+    return aCochrane - bCochrane;
+  });
+
   return {
-    estudos: [...estudosBase, ...estudosComplementares],
+    estudos: todosEstudos,
     nivelEvidencia: melhor ? melhor.nivelEvidencia : "II", // Europe PMC já filtra por nível I-III
   };
 }
