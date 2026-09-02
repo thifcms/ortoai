@@ -300,28 +300,21 @@ Materiais solicitados, com os estudos científicos já levantados no PubMed para
 ${listaMateriais}
 
 Tarefas:
-1. Avalie se os códigos TUSS propostos capturam adequadamente a complexidade dos procedimentos
-   implícitos no diagnóstico. Se outro código (ou código adicional) tende a ser mais adequado ou a
-   resultar em melhor reembolso para esse tipo de caso, sugira — sempre como sugestão para o médico
-   avaliar, nunca afirmando que a mudança já foi aplicada. Se os códigos já parecerem adequados, diga
-   isso claramente. Seja específico mas breve (2-4 frases).
-2. Escreva um texto único e corrido (não uma lista por material), em português, pronto para anexar à
-   solicitação do hospital. Esse texto deve:
-   - Abrir descrevendo a condição clínica do paciente com base no diagnóstico — a patologia, não o material.
-     ${laudoTexto ? "Correlacione essa descrição com os achados específicos do laudo de imagem informado acima." : ""}
-   - Explicar por que o procedimento é necessário para essa condição.
-   - Justificar cientificamente cada material solicitado, integrado ao raciocínio clínico do caso
-     (não uma lista solta de materiais).
-   - CITAR EXPLICITAMENTE pelo menos um estudo por material, no formato
-     "(periódico, ano — PMID: xxxxx)", usando exclusivamente os estudos listados acima. Essa citação
-     nominal é essencial: o texto precisa resistir a questionamento de auditor, então nunca afirme
-     "há evidência de nível X" sem apontar exatamente qual estudo sustenta essa afirmação.
-   - Mencionar objetivamente a consequência clínica caso o material seja negado ou substituído
-     (ex.: risco de falha de fixação, necessidade de reintervenção, sequela funcional) — sempre
-     com base no que a literatura citada efetivamente mostra, sem exagero.
-   - Se um material não tiver estudo disponível na lista, diga isso com honestidade em vez de inventar
-     uma citação — nunca cite um estudo, periódico, ano ou PMID que não esteja listado acima.
-   - Ter tom técnico-médico, adequado para leitura por auditor de convênio.
+1. Avalie se os códigos TUSS propostos capturam a complexidade do caso. Se outro código tende a
+   ser mais adequado, sugira em 1-2 frases — nunca afirme que já aplicou a mudança. Se já estiverem
+   adequados, diga isso em 1 frase.
+2. Escreva um texto único e corrido (não lista por material), em português, curto e direto o
+   suficiente para caber no campo de justificativa da solicitação do hospital — MÁXIMO 8 LINHAS
+   no total, sem parágrafos longos, sem repetição entre materiais. Priorize objetividade: frases
+   curtas, sem floreio, direto ao ponto clinicamente. O texto deve:
+   - Em 1-2 frases, descrever a condição clínica do paciente com base no diagnóstico${laudoTexto ? " e no laudo de imagem" : ""} e justificar
+     a necessidade do procedimento.
+   - Para cada material, em 1 frase curta, justificar a necessidade citando o estudo no formato
+     "(periódico, ano — PMID: xxxxx)", usando exclusivamente os estudos listados acima. Nunca afirme
+     "há evidência de nível X" sem citar o estudo. Se não houver estudo para um material, diga isso
+     em poucas palavras, sem inventar citação.
+   - Fechar com 1 frase curta sobre o risco clínico de negar o material (ex.: falha de fixação,
+     reintervenção), só se a literatura citada sustentar isso — sem exagero.
    NUNCA sugira substituir os materiais informados — eles são fixos (parceria comercial do cirurgião).
 
 Responda em português, em duas seções com os títulos exatos, cada uma começando em sua própria linha:
@@ -329,7 +322,8 @@ CODIGOS_SUGERIDOS:
 TEXTO_SOLICITACAO:
 
 IMPORTANTE: não mostre seu raciocínio, rascunho ou processo de análise — comece a resposta
-diretamente em "CODIGOS_SUGERIDOS:", sem nenhum texto antes.`;
+diretamente em "CODIGOS_SUGERIDOS:", sem nenhum texto antes. O TEXTO_SOLICITACAO não pode
+passar de 8 linhas — se estiver maior, resuma antes de responder.`;
 
   const { texto: resposta, detalhe } = await chamarIA({ prompt });
   if (!resposta) {
