@@ -184,6 +184,22 @@ async function chamarGroq({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
 
 // Tenta o Gemini primeiro (com retry em sobrecarga/limite); se esgotar as tentativas ou faltar
 // a chave, cai automaticamente para o Groq (gratuito) como fallback — mesmo padrão da Audit AI.
+// Traduz a descrição do material (geralmente em português administrativo, tipo "01 kit cânula
+// para bloqueio de nervo") para um termo curto de busca científica em inglês — sem isso, o PubMed
+// quase nunca acha nada e o material cai em nível V à toa.
+async function termoBuscaCientifica(material) {
+  const prompt = `Traduza e resuma, em inglês, o material cirúrgico abaixo em um termo curto de busca
+científica (3-6 palavras) adequado para pesquisar no PubMed — sem quantidade, sem marca comercial,
+focando na função clínica/técnica do material. Responda apenas com o termo em inglês, nada mais,
+sem aspas, sem explicação.
+
+Material: ${material}`;
+
+  const { texto } = await chamarIA({ prompt });
+  if (!texto) return material; // fallback: busca com o texto original mesmo, melhor que nada
+  return texto.trim().replace(/^["']|["']$/g, "").split("\n")[0];
+}
+
 async function chamarIA({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -307,8 +323,14 @@ Tarefas:
    suficiente para caber no campo de justificativa da solicitação do hospital — MÁXIMO 8 LINHAS
    no total, sem parágrafos longos, sem repetição entre materiais. Priorize objetividade: frases
    curtas, sem floreio, direto ao ponto clinicamente. O texto deve:
-   - Em 1-2 frases, descrever a condição clínica do paciente com base no diagnóstico${laudoTexto ? " e no laudo de imagem" : ""} e justificar
-     a necessidade do procedimento.
+   - RESTRIÇÃO CRÍTICA: fale exclusivamente sobre os códigos e materiais LISTADOS ACIMA. NUNCA
+     descreva, mencione ou preveja outro procedimento (ex.: artroscopia, meniscectomia, sinovectomia)
+     que não esteja explicitamente nos códigos informados — mesmo que o diagnóstico ou o laudo
+     sugiram que esse outro procedimento também seria indicado. O médico pediu especificamente o que
+     está na lista de códigos; a solicitação é só disso.
+   - Em 1-2 frases, descrever a condição clínica do paciente com base no diagnóstico${laudoTexto ? " e no laudo de imagem" : ""},
+     e justificar a necessidade EXATA dos procedimentos/materiais listados (não de procedimentos
+     hipotéticos adicionais).
    - Para cada material, em 1 frase curta, justificar a necessidade citando o estudo no formato
      "(periódico, ano — PMID: xxxxx)", usando exclusivamente os estudos listados acima. Nunca afirme
      "há evidência de nível X" sem citar o estudo. Se não houver estudo para um material, diga isso
@@ -376,7 +398,8 @@ app.post("/parecer", async (req, res) => {
         estudos = [];
         await store.registrarUsoCache();
       } else {
-        const resultado = await buscarPubmed(m.descricao);
+        const termoBusca = await termoBuscaCientifica(m.descricao);
+        const resultado = await buscarPubmed(termoBusca);
         estudos = resultado.estudos;
         nivelEvidencia = resultado.nivelEvidencia;
         resumo = await sintetizarComGemini({ diagnostico, material: m.descricao, estudos, exemplos, negativas });

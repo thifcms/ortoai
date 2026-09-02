@@ -832,12 +832,31 @@ function renderParecer(parecer) {
   }
 
   if (parecer.sugestaoCodigos) {
+    const codigoSugeridoMatch = parecer.sugestaoCodigos.match(/\b(\d{8})\b/);
     const sugestao = document.createElement("div");
     sugestao.className = "card";
     sugestao.style.setProperty("--stagger", proximoAtraso());
     sugestao.innerHTML = `<span class="badge ok">Sugestão de código</span>
-      <p class="suggestion-text" style="margin-top:10px;">${parecer.sugestaoCodigos}</p>`;
+      <p class="suggestion-text" style="margin-top:10px;">${parecer.sugestaoCodigos}</p>
+      ${
+        codigoSugeridoMatch
+          ? `<button class="btn-ghost btn-aplicar-sugestao" style="margin-top:10px;" data-codigo="${codigoSugeridoMatch[1]}">+ Adicionar código ${codigoSugeridoMatch[1]} e gerar de novo</button>`
+          : `<p class="suggestion-text" style="margin-top:6px; font-size:0.78rem;">Pra aplicar, toque em "Ajustar código / material" e adicione manualmente.</p>`
+      }`;
     container.appendChild(sugestao);
+
+    const btnAplicar = sugestao.querySelector(".btn-aplicar-sugestao");
+    if (btnAplicar) {
+      btnAplicar.addEventListener("click", async () => {
+        voltar(); // volta pra tela 2
+        setTimeout(() => {
+          addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+          const linha = document.getElementById("code-list").lastElementChild;
+          linha.querySelector(".tuss").value = codigoSugeridoMatch[1];
+          linha.querySelector("input:not(.tuss)").focus();
+        }, 350); // espera a navegação/animação terminar
+      });
+    }
   }
 
   parecer.itens.forEach((item) => {
