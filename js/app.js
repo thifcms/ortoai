@@ -523,6 +523,10 @@ async function processarLaudo(file) {
     status.style.display = "none";
     resultBox.style.display = "block";
 
+    if (data.textoExtraido && !data.demo) {
+      state.laudoTexto = data.textoExtraido;
+    }
+
     const temIncoerencia = data.incoerencias && data.incoerencias.length > 0;
     resultBox.innerHTML = `
       <div class="laudo-card">

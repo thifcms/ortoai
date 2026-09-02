@@ -51,6 +51,25 @@ async function consultarPubmed(query) {
   });
 }
 
+// Busca o resumo (abstract) real de um estudo pelo PMID — dá pra IA achados concretos pra citar,
+// não só o título. Só é chamado para os estudos que de fato vão ser citados (poucos por material).
+async function buscarResumoEstudo(pmid) {
+  try {
+    const params = new URLSearchParams({ db: "pubmed", id: pmid, rettype: "abstract", retmode: "xml" });
+    if (process.env.PUBMED_API_KEY) params.set("api_key", process.env.PUBMED_API_KEY);
+
+    const resp = await fetch(`${PUBMED_BASE}/efetch.fcgi?${params}`);
+    const xml = await resp.text();
+    const trechos = [...xml.matchAll(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g)];
+    if (!trechos.length) return null;
+
+    const texto = trechos.map((t) => t[1].replace(/<[^>]+>/g, "").trim()).join(" ");
+    return texto.length > 700 ? texto.slice(0, 700) + "…" : texto;
+  } catch (err) {
+    return null;
+  }
+}
+
 // Europe PMC: complementa o PubMed — acha estudos que às vezes não aparecem lá (pré-publicações,
 // revisões indexadas de outra forma), com o mesmo filtro de qualidade (nível I-III).
 async function consultarEuropePmc(termo) {
@@ -137,6 +156,14 @@ async function buscarPubmed(termo) {
     const aCochrane = (a.fonte || "").toLowerCase().includes("cochrane") ? 0 : 1;
     const bCochrane = (b.fonte || "").toLowerCase().includes("cochrane") ? 0 : 1;
     return aCochrane - bCochrane;
+  });
+
+  // Busca o resumo (abstract) real só dos 2 principais estudos — dá pra IA algo concreto pra
+  // citar, sem sobrecarregar com resumo de todo mundo.
+  const principais = todosEstudos.slice(0, 2);
+  const resumos = await Promise.all(principais.map((e) => buscarResumoEstudo(e.pmid)));
+  principais.forEach((e, i) => {
+    if (resumos[i]) e.resumoAbstract = resumos[i];
   });
 
   return {
@@ -268,20 +295,27 @@ ${avisoContexto}
 Diagnóstico: ${diagnostico}
 Material solicitado: ${material}
 Estudos científicos encontrados (PubMed, alto nível de evidência):
-${estudos.map((e) => `- ${e.titulo} (${e.ano}, ${e.fonte})`).join("\n") || "nenhum encontrado"}
+${estudos
+  .map((e) => `- ${e.titulo} (${e.ano}, ${e.fonte}, PMID: ${e.pmid})${e.resumoAbstract ? `\n  Resumo do estudo: ${e.resumoAbstract}` : ""}`)
+  .join("\n") || "nenhum encontrado"}
 
 ${contextoAprendizado}
 ${contextoNegativas}
 
-Escreva um parecer curto (máximo 4 frases), em português, objetivo e técnico, que:
+Escreva um parecer objetivo e técnico, em português (5-8 frases se necessário — não precisa ser curto,
+precisa ser robusto e difícil de questionar), que:
 - afirme a necessidade clínica do material informado, exatamente como foi especificado, com base no diagnóstico,
-- CITE EXPLICITAMENTE pelo menos um estudo da lista acima, no formato "(periódico, ano — PMID: xxxxx)" —
-  nunca apenas mencione "nível de evidência X" sem apontar qual estudo sustenta a afirmação,
+- CITE PELO MENOS 2 estudos da lista acima quando houver 2 ou mais disponíveis (cite todos se houver
+  só 1), no formato "(periódico, ano — PMID: xxxxx)" — nunca apenas mencione "nível de evidência X"
+  sem apontar qual estudo sustenta a afirmação,
+- Quando o "Resumo do estudo" estiver disponível na lista acima, cite um ACHADO CONCRETO dele (ex.:
+  desfecho medido, resultado comparativo) em vez de só mencionar que o estudo existe — isso torna a
+  justificativa muito mais difícil de questionar do que uma citação vaga,
 - use linguagem adequada para anexar a uma solicitação hospitalar.
-Não invente estudo, periódico, ano ou PMID que não esteja na lista acima. Se não houver estudo na lista,
-diga isso com honestidade em vez de citar algo inexistente. NUNCA sugira um material alternativo, genérico
-ou de outra marca — o material informado é fixo (parceria comercial do cirurgião) e sua única função é
-comprovar cientificamente a necessidade dele, não questioná-lo ou substituí-lo.`;
+Não invente estudo, periódico, ano, PMID ou achado que não esteja na lista/resumo acima. Se não houver
+estudo na lista, diga isso com honestidade em vez de citar algo inexistente. NUNCA sugira um material
+alternativo, genérico ou de outra marca — o material informado é fixo (parceria comercial do cirurgião)
+e sua única função é comprovar cientificamente a necessidade dele, não questioná-lo ou substituí-lo.`;
 
   const { texto, detalhe } = await chamarIA({ prompt });
   if (texto) return texto;
@@ -301,7 +335,11 @@ async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoT
     .map((i) => {
       const estudosFormatados = i.estudos.length
         ? i.estudos
-            .map((e) => `    · ${e.titulo} — ${e.fonte || "periódico não informado"}, ${e.ano || "s/ data"} (PMID: ${e.pmid})`)
+            .map(
+              (e) =>
+                `    · ${e.titulo} — ${e.fonte || "periódico não informado"}, ${e.ano || "s/ data"} (PMID: ${e.pmid})` +
+                (e.resumoAbstract ? `\n      Resumo: ${e.resumoAbstract}` : "")
+            )
             .join("\n")
         : "    · Nenhum estudo específico encontrado nesta busca.";
       return `- ${i.material} (nível de evidência ${i.nivelEvidencia})\n  Estudos disponíveis para citação:\n${estudosFormatados}`;
@@ -334,23 +372,24 @@ Tarefas:
 1. Avalie se os códigos TUSS propostos capturam a complexidade do caso. Se outro código tende a
    ser mais adequado, sugira em 1-2 frases — nunca afirme que já aplicou a mudança. Se já estiverem
    adequados, diga isso em 1 frase.
-2. Escreva um texto único e corrido (não lista por material), em português, curto e direto o
-   suficiente para caber no campo de justificativa da solicitação do hospital — MÁXIMO 8 LINHAS
-   no total, sem parágrafos longos, sem repetição entre materiais. Priorize objetividade: frases
-   curtas, sem floreio, direto ao ponto clinicamente. O texto deve:
+2. Escreva um texto único e corrido (não lista por material), em português, técnico e objetivo —
+   sem floreio nem repetição entre materiais, mas SEM limite curto de tamanho: pode ser tão longo
+   quanto for necessário para ficar robusto e difícil de questionar (o auditor prefere um texto bem
+   fundamentado a um texto curto e vago). O texto deve:
    - RESTRIÇÃO CRÍTICA: fale exclusivamente sobre os códigos e materiais LISTADOS ACIMA. NUNCA
      descreva, mencione ou preveja outro procedimento (ex.: artroscopia, meniscectomia, sinovectomia)
      que não esteja explicitamente nos códigos informados — mesmo que o diagnóstico ou o laudo
      sugiram que esse outro procedimento também seria indicado. O médico pediu especificamente o que
      está na lista de códigos; a solicitação é só disso.
-   - Em 1-2 frases, descrever a condição clínica do paciente com base no diagnóstico${laudoTexto ? " e no laudo de imagem" : ""},
+   - Descrever a condição clínica do paciente com base no diagnóstico${laudoTexto ? ", correlacionando explicitamente com os achados específicos do laudo de imagem informado acima (cite o achado radiológico exato, não uma menção genérica ao laudo)" : ""},
      e justificar a necessidade EXATA dos procedimentos/materiais listados (não de procedimentos
      hipotéticos adicionais).
-   - Para cada material, em 1 frase curta, justificar a necessidade citando o estudo no formato
-     "(periódico, ano — PMID: xxxxx)", usando exclusivamente os estudos listados acima. Nunca afirme
-     "há evidência de nível X" sem citar o estudo. Se não houver estudo para um material, diga isso
-     em poucas palavras, sem inventar citação.
-   - Fechar com 1 frase curta sobre o risco clínico de negar o material (ex.: falha de fixação,
+   - Para cada material, CITE PELO MENOS 2 estudos quando houver 2 ou mais disponíveis na lista
+     (cite todos se houver só 1), no formato "(periódico, ano — PMID: xxxxx)". Quando a lista trouxer
+     "Resumo" do estudo, cite um achado concreto dele (desfecho medido, resultado comparativo) — não
+     apenas "há evidência de nível X". Uma citação vaga é fácil de questionar; um achado específico não.
+     Se não houver estudo para um material, diga isso com honestidade, sem inventar citação.
+   - Fechar com 1-2 frases sobre o risco clínico de negar o material (ex.: falha de fixação,
      reintervenção), só se a literatura citada sustentar isso — sem exagero.
    NUNCA sugira substituir os materiais informados — eles são fixos (parceria comercial do cirurgião).
 
@@ -359,8 +398,7 @@ CODIGOS_SUGERIDOS:
 TEXTO_SOLICITACAO:
 
 IMPORTANTE: não mostre seu raciocínio, rascunho ou processo de análise — comece a resposta
-diretamente em "CODIGOS_SUGERIDOS:", sem nenhum texto antes. O TEXTO_SOLICITACAO não pode
-passar de 8 linhas — se estiver maior, resuma antes de responder.`;
+diretamente em "CODIGOS_SUGERIDOS:", sem nenhum texto antes.`;
 
   const { texto: resposta, detalhe } = await chamarIA({ prompt });
   if (!resposta) {
@@ -434,8 +472,8 @@ app.post("/parecer", async (req, res) => {
 
     const itens = await Promise.all(materiais.map(processarMaterial));
 
-    let laudoTexto = null;
-    if (paciente) {
+    let laudoTexto = req.body.laudoTexto || null;
+    if (!laudoTexto && paciente) {
       const registro = await store.getPaciente(paciente);
       const laudos = registro?.laudos || [];
       if (laudos.length) laudoTexto = laudos[laudos.length - 1].textoExtraido;
