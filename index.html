@@ -141,8 +141,22 @@
     </div>
 
     <div class="field-group">
+      <label>Cadastrar procedimento (combo de código + material)</label>
+      <input type="text" id="config-nome-procedimento" placeholder="Nome do procedimento (ex: Reconstrução de LCA padrão)" style="margin-bottom:10px;" />
+
+      <label style="font-size:0.72rem;">Códigos TUSS</label>
+      <div id="config-code-list"></div>
+      <button type="button" class="btn-add" id="config-add-code">+ adicionar código TUSS</button>
+
+      <label style="font-size:0.72rem; margin-top:14px;">Materiais</label>
+      <div id="config-material-list"></div>
+      <button type="button" class="btn-add" id="config-add-material">+ adicionar material</button>
+
+      <button type="button" class="btn-primary" id="config-salvar-procedimento" style="margin-top:14px;">💾 Salvar procedimento</button>
+    </div>
+
+    <div class="field-group">
       <label>Procedimentos cadastrados</label>
-      <p class="suggestion-text" style="margin-bottom:10px;">Salve um combo de códigos + materiais na etapa "Código & material" do pedido.</p>
       <div id="procedimentos-cadastrados-lista"></div>
     </div>
 

@@ -144,9 +144,50 @@ async function carregarEstatisticas() {
 // ---------- Tela de Configurações (materiais e procedimentos cadastrados) ----------
 document.getElementById("open-config").addEventListener("click", async () => {
   navegarPara("config");
+  document.getElementById("config-nome-procedimento").value = "";
+  document.getElementById("config-code-list").innerHTML = "";
+  document.getElementById("config-material-list").innerHTML = "";
+  addRow("config-code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+  addRow("config-material-list", { placeholderMain: "Ex: Âncora de sutura 5.5mm titânio", withCode: false });
   await Promise.all([carregarMateriaisCadastrados(), carregarProcedimentosCadastrados()]);
 });
 document.getElementById("close-config").addEventListener("click", voltar);
+
+document.getElementById("config-add-code").addEventListener("click", () => {
+  addRow("config-code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+});
+document.getElementById("config-add-material").addEventListener("click", () => {
+  addRow("config-material-list", { placeholderMain: "Ex: Âncora de sutura 5.5mm titânio", withCode: false });
+});
+
+document.getElementById("config-salvar-procedimento").addEventListener("click", async () => {
+  const nome = document.getElementById("config-nome-procedimento").value.trim();
+  if (!nome) {
+    alert("Digite um nome para o procedimento.");
+    return;
+  }
+  const codigos = collectRows("config-code-list", true);
+  const materiais = collectRows("config-material-list", false);
+  if (!codigos.length && !materiais.length) {
+    alert("Adicione ao menos um código ou material antes de salvar.");
+    return;
+  }
+  try {
+    await fetch(`${API_BASE}/procedimentos`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nome, codigos, materiais }),
+    });
+    document.getElementById("config-nome-procedimento").value = "";
+    document.getElementById("config-code-list").innerHTML = "";
+    document.getElementById("config-material-list").innerHTML = "";
+    addRow("config-code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
+    addRow("config-material-list", { placeholderMain: "Ex: Âncora de sutura 5.5mm titânio", withCode: false });
+    carregarProcedimentosCadastrados();
+  } catch (err) {
+    alert(`Não foi possível salvar (${err.message}).`);
+  }
+});
 
 async function atualizarDatalistMateriais() {
   try {
