@@ -535,11 +535,28 @@ const NERVOS_VALIDOS_JOELHO = [
 
 app.post("/sugerir-bloqueio", async (req, res) => {
   try {
-    const { diagnostico, laudoTexto } = req.body;
+    const { diagnostico, laudoTexto, contexto } = req.body;
     if (!diagnostico) return res.status(400).json({ erro: "Informe o diagnóstico." });
 
+    const ehDorCronica = contexto === "dor";
+
+    const contextoTexto = ehDorCronica
+      ? `CONTEXTO: este bloqueio é para MANEJO DE DOR CRÔNICA (não há cirurgia associada agora). Para
+esse contexto, o padrão clínico consolidado é o bloqueio dos NERVOS GENICULARES (ampla literatura
+específica de RCT/meta-análise para dor de osteoartrose de joelho) — prefira essa opção fortemente,
+a menos que o diagnóstico aponte claramente para outro padrão de dor (ex.: neuropatia específica de
+outro nervo). Nervos como femoral, obturador e ciático são tipicamente usados como adjuvante
+anestésico de CIRURGIA, não para manejo isolado de dor crônica — evite escolhê-los neste contexto,
+a menos que o diagnóstico realmente justifique.`
+      : `CONTEXTO: este bloqueio é ADJUVANTE DE UMA CIRURGIA de joelho (analgesia perioperatória).
+Para esse contexto, os nervos mais usados pelo próprio ortopedista são femoral, obturador e safeno
+(canal dos adutores) — o ciático entra em procedimentos mais extensos, e geniculares raramente fazem
+sentido nesse contexto cirúrgico agudo.`;
+
     const prompt = `Você é um ortopedista especialista em joelho decidindo quais nervos periféricos
-bloquear para analgesia/anestesia de uma cirurgia de joelho, com base no diagnóstico do paciente.
+bloquear, com base no diagnóstico do paciente.
+
+${contextoTexto}
 
 Diagnóstico: ${diagnostico}
 ${laudoTexto ? `Achados do laudo de imagem: ${laudoTexto}` : ""}
@@ -547,8 +564,8 @@ ${laudoTexto ? `Achados do laudo de imagem: ${laudoTexto}` : ""}
 Escolha SOMENTE entre estas opções (nunca cite outro nervo fora desta lista):
 ${NERVOS_VALIDOS_JOELHO.map((n) => `- ${n}`).join("\n")}
 
-Selecione de 1 a 3 nervos clinicamente adequados para este caso (não escolha todos por padrão —
-só os que fazem sentido para a patologia e a extensão do procedimento implícito no diagnóstico).
+Selecione de 1 a 3 nervos clinicamente adequados para este caso e para o contexto informado acima
+(não escolha todos por padrão — só os que fazem sentido).
 
 Responda em português, apenas com a lista escolhida, um nervo por linha, cada linha começando com
 "- ", usando exatamente o texto das opções acima. Não escreva mais nada além da lista — sem
@@ -564,9 +581,11 @@ explicação, sem raciocínio, sem texto antes ou depois.`;
         .filter((l) => NERVOS_VALIDOS_JOELHO.some((n) => n.toLowerCase() === l));
     }
 
-    // Se a IA falhou ou não retornou nada válido, cai num padrão seguro (os 3 mais comuns em joelho)
+    // Se a IA falhou ou não retornou nada válido, cai num padrão seguro conforme o contexto
     if (!nervosEscolhidos.length) {
-      nervosEscolhidos = ["nervo femoral", "nervo obturador", "nervo safeno (canal dos adutores)"];
+      nervosEscolhidos = ehDorCronica
+        ? ["nervos geniculares"]
+        : ["nervo femoral", "nervo obturador", "nervo safeno (canal dos adutores)"];
     }
 
     const codigos = nervosEscolhidos.map((nervo) => {

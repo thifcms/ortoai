@@ -638,10 +638,13 @@ function addRow(containerId, { placeholderMain, placeholderCode, withCode }) {
 }
 
 // ---------- Sugestão automática de código por tipo de cirurgia ----------
-async function aplicarSugestaoCirurgia(tipo) {
-  document.getElementById("tipo-aberta").classList.toggle("ativo-tipo", tipo === "aberta");
-  document.getElementById("tipo-artro").classList.toggle("ativo-tipo", tipo === "artroscopica");
-  document.getElementById("tipo-bloqueio").classList.toggle("ativo-tipo", tipo === "bloqueio");
+async function aplicarSugestaoCirurgia(tipo, contexto) {
+  if (tipo !== "bloqueio") {
+    document.getElementById("tipo-aberta").classList.toggle("ativo-tipo", tipo === "aberta");
+    document.getElementById("tipo-artro").classList.toggle("ativo-tipo", tipo === "artroscopica");
+    document.getElementById("tipo-bloqueio").classList.remove("ativo-tipo");
+    document.getElementById("bloqueio-contexto").style.display = "none";
+  }
 
   const diagnostico = document.getElementById("diagnostico").value.trim();
   const status = document.getElementById("sugestao-codigos-status");
@@ -666,7 +669,7 @@ async function aplicarSugestaoCirurgia(tipo) {
       const resp = await fetch(`${API_BASE}/sugerir-bloqueio`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ diagnostico }),
+        body: JSON.stringify({ diagnostico, contexto }),
       });
       const data = await resp.json();
       sugestoes = data.codigos || [];
@@ -723,7 +726,25 @@ async function aplicarSugestaoCirurgia(tipo) {
 
 document.getElementById("tipo-aberta").addEventListener("click", () => aplicarSugestaoCirurgia("aberta"));
 document.getElementById("tipo-artro").addEventListener("click", () => aplicarSugestaoCirurgia("artroscopica"));
-document.getElementById("tipo-bloqueio").addEventListener("click", () => aplicarSugestaoCirurgia("bloqueio"));
+document.getElementById("tipo-bloqueio").addEventListener("click", () => {
+  document.getElementById("tipo-aberta").classList.remove("ativo-tipo");
+  document.getElementById("tipo-artro").classList.remove("ativo-tipo");
+  document.getElementById("tipo-bloqueio").classList.add("ativo-tipo");
+  document.getElementById("bloqueio-contexto").style.display = "flex";
+  document.getElementById("sugestao-codigos-status").style.display = "none";
+  document.getElementById("sugestao-codigos-picker").style.display = "none";
+});
+
+document.getElementById("bloqueio-ctx-dor").addEventListener("click", () => {
+  document.getElementById("bloqueio-ctx-dor").classList.add("ativo-tipo");
+  document.getElementById("bloqueio-ctx-cirurgia").classList.remove("ativo-tipo");
+  aplicarSugestaoCirurgia("bloqueio", "dor");
+});
+document.getElementById("bloqueio-ctx-cirurgia").addEventListener("click", () => {
+  document.getElementById("bloqueio-ctx-cirurgia").classList.add("ativo-tipo");
+  document.getElementById("bloqueio-ctx-dor").classList.remove("ativo-tipo");
+  aplicarSugestaoCirurgia("bloqueio", "cirurgia");
+});
 
 document.getElementById("add-code").addEventListener("click", () => {
   addRow("code-list", { placeholderMain: "Descrição do procedimento", placeholderCode: "Código", withCode: true });
