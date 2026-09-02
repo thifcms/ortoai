@@ -51,6 +51,31 @@ async function consultarPubmed(query) {
   });
 }
 
+// Europe PMC: complementa o PubMed — acha estudos que às vezes não aparecem lá (pré-publicações,
+// revisões indexadas de outra forma), com o mesmo filtro de qualidade (nível I-III).
+async function consultarEuropePmc(termo) {
+  try {
+    const filtroEvidencia =
+      '(PUB_TYPE:"Meta-Analysis" OR PUB_TYPE:"Systematic Review" OR PUB_TYPE:"Randomized Controlled Trial" OR PUB_TYPE:"Comparative Study")';
+    const query = `${termo} AND knee AND ${filtroEvidencia}`;
+    const params = new URLSearchParams({ query, format: "json", pageSize: "5" });
+
+    const resp = await fetch(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?${params}`);
+    const data = await resp.json();
+    const resultados = data?.resultList?.result || [];
+
+    return resultados.map((r) => ({
+      pmid: r.pmid || r.id,
+      titulo: r.title,
+      ano: r.pubYear,
+      fonte: r.journalTitle || "Europe PMC",
+    }));
+  } catch (err) {
+    console.warn("Europe PMC falhou (não crítico, PubMed continua funcionando):", err.message);
+    return [];
+  }
+}
+
 // Busca em estágios, do nível de evidência mais forte para o mais fraco — só desce de nível
 // se o estágio anterior não encontrar nada. Nunca aceita nível IV/V sem antes tentar I-III.
 async function buscarPubmed(termo) {
@@ -80,23 +105,36 @@ async function buscarPubmed(termo) {
     },
   ];
 
-  // Roda todos os estágios em paralelo (não sequencial) — mesma qualidade de busca, bem mais rápido.
-  const resultados = await Promise.all(
-    estagios.map(async (estagio) => {
-      const query = estagio.restringirJoelho
-        ? `${termo} AND knee AND ${estagio.filtro}`
-        : `${termo} AND ${estagio.filtro}`;
-      const estudos = await consultarPubmed(query);
-      const nivel = estagio.nivel.startsWith("I-III") ? "II" : estagio.nivel;
-      return { estudos, nivelEvidencia: nivel, ordem: estagios.indexOf(estagio) };
-    })
-  );
+  // Europe PMC roda em paralelo com o PubMed — não atrasa a busca, só adiciona mais estudos ao final.
+  const [resultados, estudosEuropePmc] = await Promise.all([
+    Promise.all(
+      estagios.map(async (estagio) => {
+        const query = estagio.restringirJoelho
+          ? `${termo} AND knee AND ${estagio.filtro}`
+          : `${termo} AND ${estagio.filtro}`;
+        const estudos = await consultarPubmed(query);
+        const nivel = estagio.nivel.startsWith("I-III") ? "II" : estagio.nivel;
+        return { estudos, nivelEvidencia: nivel, ordem: estagios.indexOf(estagio) };
+      })
+    ),
+    consultarEuropePmc(termo),
+  ]);
 
   const melhor = resultados
     .filter((r) => r.estudos.length)
     .sort((a, b) => a.ordem - b.ordem)[0];
 
-  return melhor ? { estudos: melhor.estudos, nivelEvidencia: melhor.nivelEvidencia } : { estudos: [], nivelEvidencia: "V" };
+  if (!melhor && !estudosEuropePmc.length) return { estudos: [], nivelEvidencia: "V" };
+
+  // Mescla os estudos do PubMed com os do Europe PMC, sem duplicar por PMID
+  const estudosBase = melhor ? melhor.estudos : [];
+  const pmidsJaIncluidos = new Set(estudosBase.map((e) => String(e.pmid)));
+  const estudosComplementares = estudosEuropePmc.filter((e) => !pmidsJaIncluidos.has(String(e.pmid)));
+
+  return {
+    estudos: [...estudosBase, ...estudosComplementares],
+    nivelEvidencia: melhor ? melhor.nivelEvidencia : "II", // Europe PMC já filtra por nível I-III
+  };
 }
 
 // ---------- Gemini ----------
