@@ -116,25 +116,34 @@ async function carregarEstatisticas() {
     const ultimaData = s.ultimaAtualizacao ? new Date(s.ultimaAtualizacao).toLocaleString("pt-BR") : "ainda não houve economia registrada";
 
     container.innerHTML = `
-      <div class="card">
+      <div class="report-hero">
         <div class="meta">Chamadas de IA economizadas</div>
-        <h3>${s.chamadasEconomizadas || 0}</h3>
-        <p class="suggestion-text">Vezes que o OrtoAI usou uma resposta já aprendida em vez de chamar o Gemini/Groq de novo.</p>
+        <div class="valor">${s.chamadasEconomizadas || 0}</div>
+        <div class="contexto">vezes que o OrtoAI usou uma resposta já aprendida em vez de chamar o Gemini/Groq de novo</div>
       </div>
-      <div class="card">
-        <div class="meta">Estimativa de tokens economizados</div>
-        <h3>${(s.tokensEconomizadosEstimados || 0).toLocaleString("pt-BR")}</h3>
-        <p class="suggestion-text">Estimativa aproximada — não é uma contagem exata de tokens.</p>
+
+      <div class="report-grid">
+        <div class="report-metric">
+          <div class="meta">Tokens economizados</div>
+          <div class="valor">${(s.tokensEconomizadosEstimados || 0).toLocaleString("pt-BR")}</div>
+          <div class="contexto">estimativa aproximada</div>
+        </div>
+        <div class="report-metric">
+          <div class="meta">Materiais aprendidos</div>
+          <div class="valor">${s.totalMateriaisComExemplo || 0}</div>
+          <div class="contexto">${s.materiaisAutonomos || 0} já respondem automaticamente</div>
+        </div>
       </div>
-      <div class="card">
-        <div class="meta">Materiais já aprendidos</div>
-        <h3>${s.totalMateriaisComExemplo || 0}</h3>
-        <p class="suggestion-text">${s.materiaisAutonomos || 0} já respondem automaticamente (confiança ≥ 90%), com base em ${s.totalRespostasConfirmadas || 0} confirmações registradas.</p>
+
+      <div class="report-grid" style="grid-template-columns:1fr;">
+        <div class="report-metric">
+          <div class="meta">Confirmações registradas</div>
+          <div class="valor">${s.totalRespostasConfirmadas || 0}</div>
+          <div class="contexto">base usada para o aprendizado (confiança ≥ 90% vira resposta automática)</div>
+        </div>
       </div>
-      <div class="card">
-        <div class="meta">Última economia registrada</div>
-        <p class="suggestion-text">${ultimaData}</p>
-      </div>
+
+      <p class="report-footer">Última economia registrada: ${ultimaData}</p>
     `;
   } catch (err) {
     container.innerHTML = `<p class="suggestion-text">Não foi possível carregar as estatísticas (${err.message}).</p>`;

@@ -378,6 +378,78 @@ button:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
 .rung.lit .bar{background:linear-gradient(90deg, var(--accent), var(--accent-2));}
 .rung .n{color:var(--ink-faint);}
 
+/* ---- Padrão de relatório (card destaque + métricas) — modelo para relatórios futuros ---- */
+.report-hero{
+  background:var(--glass-strong);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:22px 20px;
+  margin-bottom:14px;
+  box-shadow:0 8px 24px rgba(16,25,40,0.06);
+  text-align:center;
+}
+.report-hero .meta{
+  font-family:'JetBrains Mono', monospace;
+  font-size:0.7rem;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+  letter-spacing:0.03em;
+}
+.report-hero .valor{
+  font-family:'Space Grotesk', sans-serif;
+  font-weight:700;
+  font-size:2.6rem;
+  line-height:1.15;
+  margin:8px 0 4px;
+  background:linear-gradient(135deg, var(--accent), var(--accent-2));
+  -webkit-background-clip:text;
+  background-clip:text;
+  color:transparent;
+}
+.report-hero .contexto{
+  font-size:0.82rem;
+  color:var(--ink-dim);
+}
+.report-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-bottom:14px;
+}
+.report-metric{
+  background:var(--glass-strong);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+}
+.report-metric .meta{
+  font-family:'JetBrains Mono', monospace;
+  font-size:0.65rem;
+  color:var(--ink-dim);
+  text-transform:uppercase;
+  letter-spacing:0.03em;
+}
+.report-metric .valor{
+  font-family:'Space Grotesk', sans-serif;
+  font-weight:700;
+  font-size:1.5rem;
+  margin:4px 0 2px;
+  color:var(--ink);
+}
+.report-metric .contexto{
+  font-size:0.76rem;
+  color:var(--ink-dim);
+  line-height:1.4;
+}
+.report-footer{
+  font-size:0.78rem;
+  color:var(--ink-faint);
+  text-align:center;
+  margin-top:6px;
+}
+
 /* ---- Result card ---- */
 .card{
   background:var(--glass-strong);
