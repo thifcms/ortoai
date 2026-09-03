@@ -28,7 +28,7 @@ async function consultarPubmed(query) {
   const params = new URLSearchParams({
     db: "pubmed",
     retmode: "json",
-    retmax: "5",
+    retmax: "8",
     sort: "relevance",
     term: query,
   });
@@ -77,7 +77,7 @@ async function consultarEuropePmc(termo) {
     const filtroEvidencia =
       '(PUB_TYPE:"Meta-Analysis" OR PUB_TYPE:"Systematic Review" OR PUB_TYPE:"Randomized Controlled Trial" OR PUB_TYPE:"Comparative Study")';
     const query = `${termo} AND knee AND ${filtroEvidencia}`;
-    const params = new URLSearchParams({ query, format: "json", pageSize: "5" });
+    const params = new URLSearchParams({ query, format: "json", pageSize: "8" });
 
     const resp = await fetch(`https://www.ebi.ac.uk/europepmc/webservices/rest/search?${params}`);
     const data = await resp.json();
@@ -150,17 +150,22 @@ async function buscarPubmed(termo) {
   const pmidsJaIncluidos = new Set(estudosBase.map((e) => String(e.pmid)));
   const estudosComplementares = estudosEuropePmc.filter((e) => !pmidsJaIncluidos.has(String(e.pmid)));
 
-  // Prioriza estudos da Cochrane (padrão-ouro de evidência) no topo, sem nenhuma busca extra —
-  // só reordena o que já foi encontrado.
+  // Prioriza estudos da Cochrane (padrão-ouro) primeiro, e entre os demais dá preferência a
+  // estudos comparativos/de superioridade — citações mais fortes que eficácia isolada vs placebo.
+  const termosComparativos = /\bsuperior|versus|\bvs\.?\b|compar(ed|ison|ative)/i;
   const todosEstudos = [...estudosBase, ...estudosComplementares].sort((a, b) => {
     const aCochrane = (a.fonte || "").toLowerCase().includes("cochrane") ? 0 : 1;
     const bCochrane = (b.fonte || "").toLowerCase().includes("cochrane") ? 0 : 1;
-    return aCochrane - bCochrane;
+    if (aCochrane !== bCochrane) return aCochrane - bCochrane;
+
+    const aComparativo = termosComparativos.test(a.titulo || "") ? 0 : 1;
+    const bComparativo = termosComparativos.test(b.titulo || "") ? 0 : 1;
+    return aComparativo - bComparativo;
   });
 
-  // Busca o resumo (abstract) real só dos 2 principais estudos — dá pra IA algo concreto pra
-  // citar, sem sobrecarregar com resumo de todo mundo.
-  const principais = todosEstudos.slice(0, 2);
+  // Busca o resumo (abstract) real dos 3 principais estudos — dá pra IA achados concretos pra
+  // citar (mais de um, com achados diferentes), sem sobrecarregar com resumo de todo mundo.
+  const principais = todosEstudos.slice(0, 3);
   const resumos = await Promise.all(principais.map((e) => buscarResumoEstudo(e.pmid)));
   principais.forEach((e, i) => {
     if (resumos[i]) e.resumoAbstract = resumos[i];
@@ -333,9 +338,11 @@ ${contextoNegativas}
 Escreva um parecer objetivo e técnico, em português (5-8 frases se necessário — não precisa ser curto,
 precisa ser robusto e difícil de questionar), que:
 - afirme a necessidade clínica do material informado, exatamente como foi especificado, com base no diagnóstico,
-- CITE PELO MENOS 2 estudos da lista acima quando houver 2 ou mais disponíveis (cite todos se houver
-  só 1), no formato "(periódico, ano — PMID: xxxxx)" — nunca apenas mencione "nível de evidência X"
-  sem apontar qual estudo sustenta a afirmação,
+- CITE de 2 a 3 estudos da lista acima quando houver disponíveis (cite todos se houver menos),
+  no formato "(periódico, ano — PMID: xxxxx)" — nunca apenas mencione "nível de evidência X"
+  sem apontar qual estudo sustenta a afirmação. Se algum estudo da lista demonstrar superioridade
+  comparativa (ex.: "superior a", "versus", "compared with"), priorize citá-lo — é uma citação mais
+  forte que um estudo isolado de eficácia vs placebo,
 - Quando o "Resumo do estudo" estiver disponível na lista acima, cite um ACHADO CONCRETO dele (ex.:
   desfecho medido, resultado comparativo) — mas EXTRAIA APENAS o achado sobre o material/técnica
   REALMENTE solicitado. Se o estudo também avaliar ou comparar outro material, técnica ou nervo
@@ -416,7 +423,17 @@ Tarefas:
    separando cada material — é um parágrafo corrido, não um documento estruturado em seções), em
    português, técnico e objetivo — sem floreio nem repetição entre materiais, mas SEM limite curto de
    tamanho: pode ser tão longo quanto for necessário para ficar robusto e difícil de questionar (o
-   auditor prefere um texto bem fundamentado a um texto curto e vago). O texto deve:
+   auditor prefere um texto bem fundamentado a um texto curto e vago).
+
+   ESTRUTURA FIXA — siga sempre esta mesma ordem de parágrafos, em todo pedido, independente do
+   caso (só o conteúdo muda, a estrutura não):
+   Parágrafo 1: frase de abertura formal de solicitação (ver instrução abaixo).
+   Parágrafo 2: quadro clínico do paciente com base no diagnóstico/laudo.
+   Parágrafo(s) seguinte(s): um parágrafo por material, na mesma ordem em que os materiais foram
+   informados, cada um justificando e citando os estudos daquele material específico.
+   Parágrafo final: consequência clínica de negar os materiais, integrada ao texto corrido.
+
+   O texto deve:
    - ABRIR com uma frase direta e formal de solicitação, endereçada ao auditor do convênio, nomeando
      objetivamente os procedimentos/materiais e os códigos TUSS envolvidos (ex.: "Solicito autorização
      para realização de [procedimento(s)], código(s) TUSS [X e Y], com uso de [material(is)], conforme
@@ -430,8 +447,10 @@ Tarefas:
    - Descrever a condição clínica do paciente com base no diagnóstico${laudoTexto ? ", correlacionando explicitamente com os achados específicos do laudo de imagem informado acima (cite o achado radiológico exato, não uma menção genérica ao laudo)" : ""},
      e justificar a necessidade EXATA dos procedimentos/materiais listados (não de procedimentos
      hipotéticos adicionais).
-   - Para cada material, CITE PELO MENOS 2 estudos quando houver 2 ou mais disponíveis na lista
-     (cite todos se houver só 1), no formato "(periódico, ano — PMID: xxxxx)". Quando a lista trouxer
+   - Para cada material, CITE de 2 a 3 estudos quando houver disponíveis na lista (cite todos se
+     houver menos), no formato "(periódico, ano — PMID: xxxxx)". Se algum estudo demonstrar
+     superioridade comparativa (ex.: "superior a", "versus", "compared with"), priorize citá-lo.
+     Quando a lista trouxer
      "Resumo" do estudo, cite um achado concreto dele (desfecho medido, resultado comparativo) — não
      apenas "há evidência de nível X". Uma citação vaga é fácil de questionar; um achado específico não.
      EXTRAIA APENAS o achado sobre o material/técnica REALMENTE solicitado: se o estudo também avaliar
