@@ -225,11 +225,19 @@ async function chamarGroq({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
 // Traduz a descrição do material (geralmente em português administrativo, tipo "01 kit cânula
 // para bloqueio de nervo") para um termo curto de busca científica em inglês — sem isso, o PubMed
 // quase nunca acha nada e o material cai em nível V à toa.
-async function termoBuscaCientifica(material) {
+async function termoBuscaCientifica(material, contextoCodigos) {
   const prompt = `Traduza e resuma, em inglês, o material cirúrgico abaixo em um termo curto de busca
 científica (3-6 palavras) adequado para pesquisar no PubMed — sem quantidade, sem marca comercial,
-focando na função clínica/técnica do material. Responda apenas com o termo em inglês, nada mais,
-sem aspas, sem explicação.
+focando na função clínica/técnica do material.
+${
+  contextoCodigos
+    ? `Use este contexto do procedimento (códigos solicitados) para tornar o termo mais ESPECÍFICO
+quando o material for algo genérico (ex.: um "kit de cânula" usado num bloqueio de nervo genicular
+deve virar "genicular nerve block", não um termo genérico de bloqueio):
+${contextoCodigos}`
+    : ""
+}
+Responda apenas com o termo em inglês, nada mais, sem aspas, sem explicação.
 
 Material: ${material}`;
 
@@ -323,9 +331,18 @@ precisa ser robusto e difícil de questionar), que:
   só 1), no formato "(periódico, ano — PMID: xxxxx)" — nunca apenas mencione "nível de evidência X"
   sem apontar qual estudo sustenta a afirmação,
 - Quando o "Resumo do estudo" estiver disponível na lista acima, cite um ACHADO CONCRETO dele (ex.:
-  desfecho medido, resultado comparativo) em vez de só mencionar que o estudo existe — isso torna a
-  justificativa muito mais difícil de questionar do que uma citação vaga,
-- use linguagem adequada para anexar a uma solicitação hospitalar.
+  desfecho medido, resultado comparativo) — mas EXTRAIA APENAS o achado sobre o material/técnica
+  REALMENTE solicitado. Se o estudo também avaliar ou comparar outro material, técnica ou nervo
+  diferente do que está sendo pedido (ex.: bloqueio femoral quando o pedido é genicular; PRP quando
+  o pedido é ácido hialurônico), NÃO mencione esse outro procedimento de forma alguma — cite só a
+  parte do estudo relevante ao que foi solicitado,
+- Evite termos em inglês sempre que houver equivalente em português (ex.: "escala visual analógica
+  de dor" em vez de "VAS"); quando o nome do instrumento não tiver tradução consagrada, pode mantê-lo,
+- use linguagem adequada para anexar a uma solicitação hospitalar,
+- escreva como um PEDIDO MÉDICO INICIAL (o cirurgião solicitando autorização), nunca como uma
+  contestação, recurso ou resposta a uma negativa já recebida — não use estrutura de "argumento de
+  defesa" nem títulos como "risco de não fornecimento"; integre a consequência clínica de forma
+  natural dentro do texto corrido, em tom de justificativa direta, não de rebate.
 Não invente estudo, periódico, ano, PMID ou achado que não esteja na lista/resumo acima. Se não houver
 estudo na lista, diga isso com honestidade em vez de citar algo inexistente. NUNCA sugira um material
 alternativo, genérico ou de outra marca — o material informado é fixo (parceria comercial do cirurgião)
@@ -389,10 +406,11 @@ Tarefas:
 1. Avalie se os códigos TUSS propostos capturam a complexidade do caso. Se outro código tende a
    ser mais adequado, sugira em 1-2 frases — nunca afirme que já aplicou a mudança. Se já estiverem
    adequados, diga isso em 1 frase.
-2. Escreva um texto único e corrido (não lista por material), em português, técnico e objetivo —
-   sem floreio nem repetição entre materiais, mas SEM limite curto de tamanho: pode ser tão longo
-   quanto for necessário para ficar robusto e difícil de questionar (o auditor prefere um texto bem
-   fundamentado a um texto curto e vago). O texto deve:
+2. Escreva um texto único e corrido (não lista por material, SEM cabeçalhos em negrito ou títulos
+   separando cada material — é um parágrafo corrido, não um documento estruturado em seções), em
+   português, técnico e objetivo — sem floreio nem repetição entre materiais, mas SEM limite curto de
+   tamanho: pode ser tão longo quanto for necessário para ficar robusto e difícil de questionar (o
+   auditor prefere um texto bem fundamentado a um texto curto e vago). O texto deve:
    - RESTRIÇÃO CRÍTICA: fale exclusivamente sobre os códigos e materiais LISTADOS ACIMA. NUNCA
      descreva, mencione ou preveja outro procedimento (ex.: artroscopia, meniscectomia, sinovectomia)
      que não esteja explicitamente nos códigos informados — mesmo que o diagnóstico ou o laudo
@@ -405,9 +423,20 @@ Tarefas:
      (cite todos se houver só 1), no formato "(periódico, ano — PMID: xxxxx)". Quando a lista trouxer
      "Resumo" do estudo, cite um achado concreto dele (desfecho medido, resultado comparativo) — não
      apenas "há evidência de nível X". Uma citação vaga é fácil de questionar; um achado específico não.
-     Se não houver estudo para um material, diga isso com honestidade, sem inventar citação.
+     EXTRAIA APENAS o achado sobre o material/técnica REALMENTE solicitado: se o estudo também avaliar
+     ou comparar outro material, técnica ou nervo diferente do que está sendo pedido (ex.: bloqueio
+     femoral quando o pedido é genicular; PRP quando o pedido é ácido hialurônico), NÃO mencione esse
+     outro procedimento de forma alguma. Se não houver estudo para um material, diga isso com
+     honestidade, sem inventar citação.
+   - Evite termos em inglês sempre que houver equivalente consagrado em português (ex.: "escala visual
+     analógica de dor" em vez de "VAS"); mantenha só o que não tiver tradução usual na prática clínica.
+   - Escreva como um PEDIDO MÉDICO INICIAL — o cirurgião solicitando autorização pela primeira vez,
+     nunca como contestação, recurso ou resposta a uma negativa já recebida. Não use títulos como
+     "risco de não fornecimento" nem estrutura de "argumento de defesa". Integre a consequência clínica
+     de negar o material de forma natural dentro do texto corrido, em tom de justificativa direta.
    - Fechar com 1-2 frases sobre o risco clínico de negar o material (ex.: falha de fixação,
-     reintervenção), só se a literatura citada sustentar isso — sem exagero.
+     reintervenção), só se a literatura citada sustentar isso — sem exagero, integradas ao texto
+     corrido, não como uma seção separada com título próprio.
    NUNCA sugira substituir os materiais informados — eles são fixos (parceria comercial do cirurgião).
 
 Responda em português, em duas seções com os títulos exatos, cada uma começando em sua própria linha:
@@ -468,7 +497,8 @@ app.post("/parecer", async (req, res) => {
         estudos = [];
         await store.registrarUsoCache();
       } else {
-        const termoBusca = await termoBuscaCientifica(m.descricao);
+        const contextoCodigos = codigos.map((c) => c.descricao).filter(Boolean).join("; ");
+        const termoBusca = await termoBuscaCientifica(m.descricao, contextoCodigos);
         const resultado = await buscarPubmed(termoBusca);
         estudos = resultado.estudos;
         nivelEvidencia = resultado.nivelEvidencia;
