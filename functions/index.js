@@ -296,8 +296,11 @@ de forma que antecipe e neutralize esses argumentos, sem citá-los literalmente:
 
   const avisoContexto =
     contextoBloqueio === "dor"
-      ? `\nATENÇÃO: este é um pedido de MANEJO DE DOR CRÔNICA, sem cirurgia associada. NUNCA use
-"perioperatório(a)", "pós-operatório(a)" ou linguagem de cirurgia — isso seria factualmente errado.\n`
+      ? `\nATENÇÃO: este é um pedido de MANEJO DE DOR CRÔNICA de joelho, realizado pelo próprio ortopedista
+(NÃO é uma indicação de anestesista, nem cirurgia associada). NUNCA use "perioperatório(a)",
+"pós-operatório(a)" ou linguagem de cirurgia — isso seria factualmente errado. Se o material for
+bloqueio de nervo periférico, trate-o especificamente como bloqueio dos NERVOS GENICULARES para
+dor de osteoartrose de joelho, procedimento intervencionista realizado pelo ortopedista.\n`
       : "";
 
   const prompt = `Você é um especialista em cirurgia de joelho auxiliando um cirurgião a justificar
@@ -359,11 +362,14 @@ async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoT
 
   const avisoContexto =
     contextoBloqueio === "dor"
-      ? `\nATENÇÃO — CONTEXTO CRÍTICO: este pedido é de MANEJO DE DOR CRÔNICA, sem nenhuma cirurgia
-associada agora. NUNCA use os termos "perioperatório(a)", "pós-operatório(a)", "intraoperatório(a)"
-ou qualquer linguagem que sugira que há uma cirurgia acontecendo — isso seria factualmente errado e
-enfraqueceria o pedido perante o auditor. Descreva como tratamento intervencionista/ambulatorial da
-dor (ex.: "alívio da dor crônica", "tratamento conservador da dor", "melhora funcional").\n`
+      ? `\nATENÇÃO — CONTEXTO CRÍTICO: este pedido é de MANEJO DE DOR CRÔNICA de joelho, realizado pelo
+próprio ortopedista (NÃO é indicação de anestesista, nem há cirurgia associada agora). NUNCA use os
+termos "perioperatório(a)", "pós-operatório(a)", "intraoperatório(a)" ou qualquer linguagem que
+sugira que há uma cirurgia acontecendo — isso seria factualmente errado e enfraqueceria o pedido
+perante o auditor. Descreva como tratamento intervencionista/ambulatorial da dor (ex.: "alívio da
+dor crônica", "tratamento conservador da dor", "melhora funcional"). Se o material for bloqueio de
+nervo periférico, trate-o especificamente como bloqueio dos NERVOS GENICULARES para dor de
+osteoartrose de joelho — não femoral, obturador ou outro nervo de contexto cirúrgico.\n`
       : "";
 
   const prompt = `Você é um especialista em cirurgia de joelho auxiliando um cirurgião a montar uma
@@ -604,32 +610,31 @@ app.post("/sugerir-bloqueio", async (req, res) => {
 
     const ehDorCronica = contexto === "dor";
 
-    const contextoTexto = ehDorCronica
-      ? `CONTEXTO: este bloqueio é para MANEJO DE DOR CRÔNICA (não há cirurgia associada agora). Para
-esse contexto, o padrão clínico consolidado é o bloqueio dos NERVOS GENICULARES (ampla literatura
-específica de RCT/meta-análise para dor de osteoartrose de joelho) — prefira essa opção fortemente,
-a menos que o diagnóstico aponte claramente para outro padrão de dor (ex.: neuropatia específica de
-outro nervo). Nervos como femoral, obturador e ciático são tipicamente usados como adjuvante
-anestésico de CIRURGIA, não para manejo isolado de dor crônica — evite escolhê-los neste contexto,
-a menos que o diagnóstico realmente justifique.`
-      : `CONTEXTO: este bloqueio é ADJUVANTE DE UMA CIRURGIA de joelho (analgesia perioperatória).
-Para esse contexto, os nervos mais usados pelo próprio ortopedista são femoral, obturador e safeno
-(canal dos adutores) — o ciático entra em procedimentos mais extensos, e geniculares raramente fazem
-sentido nesse contexto cirúrgico agudo.`;
+    // Dor crônica de joelho (sem cirurgia): não deixa a critério da IA — o padrão clínico
+    // consolidado é sempre o bloqueio dos nervos geniculares. Decidir isso de forma fixa evita
+    // que a IA ocasionalmente ignore a instrução e volte a sugerir um nervo de contexto cirúrgico.
+    if (ehDorCronica) {
+      return res.json({
+        codigos: [{ codigo: "31602118", descricao: "Bloqueio de nervo periférico (nervos geniculares)" }],
+        demo: false,
+        detalhe: null,
+      });
+    }
 
     const prompt = `Você é um ortopedista especialista em joelho decidindo quais nervos periféricos
-bloquear, com base no diagnóstico do paciente.
-
-${contextoTexto}
+bloquear como adjuvante analgésico de uma CIRURGIA de joelho (não é manejo de dor crônica isolado),
+com base no diagnóstico do paciente. Os nervos mais usados pelo próprio ortopedista nesse contexto
+são femoral, obturador e safeno (canal dos adutores) — o ciático entra em procedimentos mais
+extensos. NUNCA escolha "nervos geniculares" aqui — esse é usado apenas para dor crônica sem cirurgia.
 
 Diagnóstico: ${diagnostico}
 ${laudoTexto ? `Achados do laudo de imagem: ${laudoTexto}` : ""}
 
 Escolha SOMENTE entre estas opções (nunca cite outro nervo fora desta lista):
-${NERVOS_VALIDOS_JOELHO.map((n) => `- ${n}`).join("\n")}
+${NERVOS_VALIDOS_JOELHO.filter((n) => n !== "nervos geniculares").map((n) => `- ${n}`).join("\n")}
 
-Selecione de 1 a 3 nervos clinicamente adequados para este caso e para o contexto informado acima
-(não escolha todos por padrão — só os que fazem sentido).
+Selecione de 1 a 3 nervos clinicamente adequados para este caso (não escolha todos por padrão —
+só os que fazem sentido).
 
 Responda em português, apenas com a lista escolhida, um nervo por linha, cada linha começando com
 "- ", usando exatamente o texto das opções acima. Não escreva mais nada além da lista — sem
@@ -645,11 +650,9 @@ explicação, sem raciocínio, sem texto antes ou depois.`;
         .filter((l) => NERVOS_VALIDOS_JOELHO.some((n) => n.toLowerCase() === l));
     }
 
-    // Se a IA falhou ou não retornou nada válido, cai num padrão seguro conforme o contexto
+    // Se a IA falhou ou não retornou nada válido, cai num padrão seguro
     if (!nervosEscolhidos.length) {
-      nervosEscolhidos = ehDorCronica
-        ? ["nervos geniculares"]
-        : ["nervo femoral", "nervo obturador", "nervo safeno (canal dos adutores)"];
+      nervosEscolhidos = ["nervo femoral", "nervo obturador", "nervo safeno (canal dos adutores)"];
     }
 
     const codigos = nervosEscolhidos.map((nervo) => {
