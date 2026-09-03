@@ -226,14 +226,20 @@ async function chamarGroq({ prompt, imagemBase64, mimeType = "image/jpeg" }) {
 // para bloqueio de nervo") para um termo curto de busca científica em inglês — sem isso, o PubMed
 // quase nunca acha nada e o material cai em nível V à toa.
 async function termoBuscaCientifica(material, contextoCodigos) {
+  // Atalho determinístico: se os códigos já mencionam um nervo/estrutura específica bem conhecida,
+  // usa o termo científico direto em vez de confiar na IA para inferir isso do contexto — mais
+  // confiável, principalmente pra termos que a busca precisa acertar sempre (ex.: genicular).
+  const contextoNorm = (contextoCodigos || "").toLowerCase();
+  if (contextoNorm.includes("genicular")) return "genicular nerve block knee osteoarthritis";
+
   const prompt = `Traduza e resuma, em inglês, o material cirúrgico abaixo em um termo curto de busca
 científica (3-6 palavras) adequado para pesquisar no PubMed — sem quantidade, sem marca comercial,
 focando na função clínica/técnica do material.
 ${
   contextoCodigos
     ? `Use este contexto do procedimento (códigos solicitados) para tornar o termo mais ESPECÍFICO
-quando o material for algo genérico (ex.: um "kit de cânula" usado num bloqueio de nervo genicular
-deve virar "genicular nerve block", não um termo genérico de bloqueio):
+quando o material for algo genérico (ex.: um "kit de cânula" usado num bloqueio de nervo específico
+deve virar o nome científico desse nervo, não um termo genérico de bloqueio):
 ${contextoCodigos}`
     : ""
 }
@@ -411,6 +417,11 @@ Tarefas:
    português, técnico e objetivo — sem floreio nem repetição entre materiais, mas SEM limite curto de
    tamanho: pode ser tão longo quanto for necessário para ficar robusto e difícil de questionar (o
    auditor prefere um texto bem fundamentado a um texto curto e vago). O texto deve:
+   - ABRIR com uma frase direta e formal de solicitação, endereçada ao auditor do convênio, nomeando
+     objetivamente os procedimentos/materiais e os códigos TUSS envolvidos (ex.: "Solicito autorização
+     para realização de [procedimento(s)], código(s) TUSS [X e Y], com uso de [material(is)], conforme
+     justificativa clínica e científica a seguir."). Só depois dessa frase de abertura, siga com a
+     fundamentação clínica e científica.
    - RESTRIÇÃO CRÍTICA: fale exclusivamente sobre os códigos e materiais LISTADOS ACIMA. NUNCA
      descreva, mencione ou preveja outro procedimento (ex.: artroscopia, meniscectomia, sinovectomia)
      que não esteja explicitamente nos códigos informados — mesmo que o diagnóstico ou o laudo
