@@ -370,6 +370,17 @@ e sua única função é comprovar cientificamente a necessidade dele, não ques
 
 // Texto final da solicitação: consolida diagnóstico + códigos + evidência de todos os materiais
 // num único texto corrido, e sugere ajuste de código automaticamente (sem o médico precisar pedir).
+// Texto aprovado pelo médico como referência de tom/estilo (não de conteúdo — ver instrução no prompt).
+const EXEMPLO_ESTILO_APROVADO = `Solicito autorização para realização de bloqueio de nervos periféricos (nervos geniculares), código TUSS 31602118, e punção articular diagnóstica/terapêutica com infiltração intra-articular de ácido hialurônico de alta pureza, código TUSS 30713137, para a paciente Vanice Clemente, joelho direito, conforme fundamentação clínica e científica a seguir.
+
+A ressonância magnética do joelho direito evidencia alteração degenerativa difusa dos meniscos, predominante no menisco lateral, com rotura horizontal do corpo e corno posterior associada a extrusão meniscal e perimeniscite; degeneração do menisco medial sem rotura associada; alterações degenerativas avançadas do compartimento femorotibial lateral, com exposição de osso subcondral, esclerose e cistos subcondrais; condropatia patelofemoral incipiente; derrame articular moderado com sinais de sinovite reacional; e entesopatia do aparelho extensor. Esse conjunto de achados caracteriza gonartrose tricompartimental de predomínio femorotibial lateral, quadro compatível com a dor crônica intensa e a limitação funcional relatadas pela paciente, refratárias ao tratamento clínico conservador, justificando a indicação de abordagem intervencionista ambulatorial voltada ao alívio da dor e à melhora funcional.
+
+O bloqueio dos nervos geniculares é procedimento intervencionista realizado pelo próprio ortopedista para controle da dor nociceptiva de origem articular em pacientes com gonartrose. Ensaio clínico randomizado, controlado por placebo, demonstrou alívio significativo da dor no curto prazo com o bloqueio dos nervos geniculares em pacientes com osteoartrose de joelho (Arthritis & Rheumatology, 2023 — PMID: 36369781). Revisão sistemática com meta-análise de ensaios clínicos randomizados mostrou redução estatisticamente significativa da dor e melhora da função articular no primeiro e terceiro mês após o procedimento (Pain Physician, 2022 — PMID: 39143682). Esses dados sustentam a indicação do bloqueio dos nervos geniculares, realizado com o kit de cânula solicitado, para o manejo da dor crônica desta paciente.
+
+A infiltração intra-articular de ácido hialurônico de alta pureza tem respaldo em evidência de nível I para o tratamento da osteoartrose de joelho. Meta-análise de ensaios clínicos randomizados demonstrou melhora dos escores de dor a partir do terceiro mês de acompanhamento, com benefício mantido até o sexto mês após a infiltração (Experimental and Therapeutic Medicine, 2015 — PMID: 25574222). Revisão sistemática de meta-análises sobre o uso do ácido hialurônico intra-articular na osteoartrose de joelho corroborou esse efeito terapêutico sobre a dor e a função articular ao longo do acompanhamento clínico (Scientific Reports, 2016 — PMID: 27616273). Esses achados sustentam a indicação da infiltração de ácido hialurônico de alta pureza para controle da dor e melhora funcional desta paciente.
+
+A não realização desses procedimentos tende a manter a dor crônica intensa e a limitação funcional já relatadas, com possível necessidade de maior uso de analgesia sistêmica e progressão dos sintomas articulares — desfechos evitáveis com a intervenção ora solicitada.`;
+
 async function gerarSolicitacaoConsolidada({ diagnostico, codigos, itens, laudoTexto, contextoBloqueio }) {
   const listaCodigos = codigos.length
     ? codigos.map((c) => `- ${c.codigo || "(sem código)"}: ${c.descricao}`).join("\n")
@@ -405,6 +416,14 @@ osteoartrose de joelho — não femoral, obturador ou outro nervo de contexto ci
   const prompt = `Você é um especialista em cirurgia de joelho auxiliando um cirurgião a montar uma
 solicitação cirúrgica completa para envio ao convênio, com foco em reduzir o risco de glosa e usar os
 códigos TUSS mais adequados à complexidade real do caso (nunca fraudulentos — apenas mais precisos).
+
+MODELO DE REFERÊNCIA — o médico aprovou este texto como exemplo do TOM e ESTILO de escrita que
+espera (formalidade, construção de frases, forma de citar estudo, jeito de fechar o parágrafo).
+Use como referência de COMO escrever, mas NUNCA reaproveite os dados, diagnóstico, PMIDs ou
+achados deste exemplo em outro caso — isso é só um exemplo de estilo, não de conteúdo:
+
+"${EXEMPLO_ESTILO_APROVADO}"
+
 ${avisoContexto}
 Diagnóstico do paciente: ${diagnostico}
 ${laudoTexto ? `Achados do laudo de imagem (RM): ${laudoTexto}` : ""}
